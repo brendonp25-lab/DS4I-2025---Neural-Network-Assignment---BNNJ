@@ -1,5 +1,3 @@
-Here’s a clean, professional `README.md` draft tailored to your assignment and group’s objective (Problem A). You can paste this directly into your GitHub repo’s README file:
-
 ---
 
 ```markdown
