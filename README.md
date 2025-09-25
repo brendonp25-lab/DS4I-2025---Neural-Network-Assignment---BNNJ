@@ -1,6 +1,3 @@
----
-
-```markdown
 # 🧠 Neural Network Avalanche Forecasting – STA5073Z Assignment 1
 
 ## 📍 University of Cape Town  
@@ -94,6 +91,3 @@ Each member’s role and contributions will be documented in the scientific pape
 
 ---
 
-```
-
-Let me know if you want to personalize the author section or add links to your GitHub Pages site once it's live. I can also help format your `.qmd` file or set up the repo structure for your report and code. You're on a roll!
