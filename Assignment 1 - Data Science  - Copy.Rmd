@@ -1,0 +1,2160 @@
+---
+title: "STA5073Z – Data Science for Industry 2025 - Assignment 1"
+---
+
+This R Markdown file covers the Model for Assignment 1. The code should be read
+in conjunction with the corresponding Report. The Model aims to predict FAH.
+
+The section below loads the data.
+
+```{r}
+
+# Scottish Avalanche Hazard Prediction using Enhanced Neural Networks
+
+# Load required libraries
+library(tidyverse)
+library(keras3)
+library(tensorflow)
+library(glmnet)
+library(VIM)
+library(corrplot)
+library(caret)
+library(ROSE)
+library(randomForest)
+library(xgboost)
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+library(ggplot2)
+library(scales)
+library(lubridate)
+library(irr)
+library(MLmetrics)
+
+# Check if corrplot is available, if not, skip correlation plot
+corrplot_available <- requireNamespace("corrplot", quietly = TRUE)
+
+# Set random seed for reproducibility
+set.seed(42)
+
+# DATA LOADING AND INITIAL EXPLORATION
+# Assuming the marker has the dataset loaded in the source directory
+# Load the dataset
+data <- read.csv("scotland_avalanche_forecasts_2009_2025.csv", stringsAsFactors = FALSE)
+```
+
+The section below covers exploratory data analysis (EDA) and primarily focuses
+on providing an overview of the data set.
+
+```{r}
+
+# DATASET OVERVIEW & STRUCTURE
+
+cat("\n=== DATASET OVERVIEW & STRUCTURE ===\n")
+
+# Dataset dimensions
+cat(sprintf("Dataset Dimensions: %d rows × %d columns\n", nrow(data), ncol(data)))
+
+# Data structure analysis
+data_structure <- data.frame(
+  Variable = colnames(data),
+  Type = sapply(data, class),
+  Non_Missing = sapply(data, function(x) sum(!is.na(x) & x != "" & x != "NA")),
+  Missing = sapply(data, function(x) sum(is.na(x) | x == "" | x == "NA")),
+  Missing_Pct = round(sapply(data, function(x) sum(is.na(x) | x == "" | x == "NA") / length(x) * 100), 2),
+  Unique_Values = sapply(data, function(x) {
+    clean_x <- x[!is.na(x) & x != "" & x != "NA"]
+    length(unique(clean_x))
+  }),
+  stringsAsFactors = FALSE
+)
+
+# Identify variable types
+numeric_vars <- data_structure$Variable[data_structure$Type %in% c("numeric", "integer")]
+categorical_vars <- data_structure$Variable[data_structure$Type %in% c("character", "factor")]
+
+data_structure$Variable_Type <- ifelse(data_structure$Variable %in% numeric_vars, "Numeric", "Categorical")
+
+cat("Data Structure Summary:\n")
+print(kable(data_structure, caption = "Dataset Structure Overview") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+
+cat(sprintf("\nVariable Type Distribution:\n"))
+cat(sprintf("- Numeric variables: %d\n", length(numeric_vars)))
+cat(sprintf("- Categorical variables: %d\n", length(categorical_vars)))
+
+# Summary statistics for numeric variables
+if(length(numeric_vars) > 0) {
+  cat("\n=== NUMERIC VARIABLES SUMMARY STATISTICS ===\n")
+  
+  # Convert to numeric and handle non-numeric values
+  numeric_data <- data[, numeric_vars, drop = FALSE]
+  for(col in names(numeric_data)) {
+    numeric_data[[col]] <- as.numeric(ifelse(numeric_data[[col]] == "NA", NA, numeric_data[[col]]))
+  }
+  
+  numeric_summary <- numeric_data %>%
+    summarise_all(list(
+      Count = ~sum(!is.na(.)),
+      Mean = ~round(mean(., na.rm = TRUE), 3),
+      Median = ~round(median(., na.rm = TRUE), 3),
+      SD = ~round(sd(., na.rm = TRUE), 3),
+      Min = ~round(min(., na.rm = TRUE), 3),
+      Max = ~round(max(., na.rm = TRUE), 3),
+      Q25 = ~round(quantile(., 0.25, na.rm = TRUE), 3),
+      Q75 = ~round(quantile(., 0.75, na.rm = TRUE), 3)
+    )) %>%
+    gather(key = "Metric", value = "Value") %>%
+    separate(Metric, into = c("Variable", "Statistic"), sep = "_") %>%
+    spread(key = "Statistic", value = "Value")
+  
+  print(kable(numeric_summary, caption = "Summary Statistics for Numeric Variables") %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+}
+
+```
+
+This next section of the Model continues EDA and focuses on the distribution
+of the target variable i.e., FAH.
+
+This code chunk performs a comprehensive analysis of the target variable FAH (Forecast Avalanche Hazard), which is essential for understanding the distribution and quality of the response variable in our neural network model. The analysis begins by calculating the frequency distribution and percentages for each hazard level. A formatted table displays these statistics to provide clear insight into the class distribution. The chunk also quantifies missing data patterns by calculating both the count and percentage of missing FAH values versus valid observations, which is crucial for assessing data quality and potential preprocessing needs. To evaluate class imbalance, the code computes the ratio between the most and least frequent classes, identifying potential challenges for model training that may require techniques like class weighting or resampling. Finally, the analysis generates four visualizations: a bar plot showing the raw distribution of FAH levels, a pie chart displaying percentage distributions, and a bar chart comparing valid versus missing observations, providing both numerical and visual perspectives on the target variable's characteristics that will inform subsequent modeling decisions.
+
+```{r}
+
+# TARGET VARIABLE ANALYSIS (FAH)
+
+cat("\n=== TARGET VARIABLE ANALYSIS (FAH) ===\n")
+
+# FAH distribution analysis
+fah_clean <- data$FAH[!is.na(data$FAH) & data$FAH != "" & data$FAH != "NA"]
+fah_distribution <- table(fah_clean)
+fah_pct <- round(prop.table(fah_distribution) * 100, 2)
+
+fah_summary <- data.frame(
+  FAH_Level = names(fah_distribution),
+  Count = as.numeric(fah_distribution),
+  Percentage = as.numeric(fah_pct),
+  stringsAsFactors = FALSE
+)
+
+cat("FAH Distribution:\n")
+print(kable(fah_summary, caption = "Forecast Avalanche Hazard (FAH) Distribution") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+
+# Missing FAH analysis
+fah_missing <- sum(is.na(data$FAH) | data$FAH == "" | data$FAH == "NA")
+fah_missing_pct <- round(fah_missing / nrow(data) * 100, 2)
+
+cat(sprintf("\nMissing FAH Values:\n"))
+cat(sprintf("- Missing count: %d (%.2f%%)\n", fah_missing, fah_missing_pct))
+cat(sprintf("- Valid count: %d (%.2f%%)\n", nrow(data) - fah_missing, 100 - fah_missing_pct))
+
+# Class imbalance assessment
+if(length(fah_distribution) > 1) {
+  max_class <- max(fah_distribution)
+  min_class <- min(fah_distribution)
+  imbalance_ratio <- max_class / min_class
+  
+  cat(sprintf("\nClass Imbalance Analysis:\n"))
+  cat(sprintf("- Most frequent class: %s (%d observations)\n", names(which.max(fah_distribution)), max_class))
+  cat(sprintf("- Least frequent class: %s (%d observations)\n", names(which.min(fah_distribution)), min_class))
+  cat(sprintf("- Imbalance ratio: %.2f:1\n", imbalance_ratio))
+}
+
+# First plot - Bar chart
+par(mar = c(6, 4, 3, 2))
+barplot(fah_distribution, 
+        main = "FAH Distribution", 
+        ylab = "Count", 
+        col = rainbow(length(fah_distribution)),
+        las = 2,
+        cex.names = 0.8)
+
+# Second plot - Pie chart (gets full window space)
+par(mar = c(2, 2, 3, 2))
+pie(fah_distribution, 
+    main = "FAH Distribution (%)", 
+    col = rainbow(length(fah_distribution)),
+    labels = paste0(names(fah_distribution), "\n(", fah_pct, "%)"))
+
+# Third plot - Missing data
+par(mar = c(6, 4, 3, 2))
+barplot(missing_data, 
+        main = "FAH Data Completeness", 
+        ylab = "Count",
+        col = c("lightgreen", "lightcoral"))
+
+```
+This code chunk conducts a systematic analysis of missing data patterns across all variables in the dataset. The analysis leverages the previously computed data structure summary to examine missing data percentages by variable, presenting results in a well-formatted table sorted by missing data severity. The chunk implements a threshold-based categorization system that identifies variables with high missing rates (>20%) and moderate missing rates (5-20%), providing clear guidance on which variables may require special handling such as imputation, removal, or careful consideration during feature selection. Two complementary visualizations enhance the analysis: a color-coded bar plot highlighting the top 15 variables with the highest missing percentages using a traffic light system (red for high, orange for moderate, blue for low missingness), and an aggregation plot from the VIM package that creates a missing data heatmap for the top 20 most problematic variables. 
+```{r}
+
+# 
+# MISSING DATA ANALYSIS
+
+cat("\n=== MISSING DATA ANALYSIS ===\n")
+
+# Variable-wise missing analysis (already computed in data_structure)
+missing_summary <- data_structure %>%
+  select(Variable, Missing, Missing_Pct, Variable_Type) %>%
+  arrange(desc(Missing_Pct))
+
+cat("Missing Data by Variable:\n")
+print(kable(missing_summary, caption = "Missing Data Analysis by Variable") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+
+# Threshold analysis
+high_missing_vars <- missing_summary$Variable[missing_summary$Missing_Pct > 20]
+moderate_missing_vars <- missing_summary$Variable[missing_summary$Missing_Pct > 5 & missing_summary$Missing_Pct <= 20]
+
+cat(sprintf("\n=== MISSING DATA THRESHOLD ANALYSIS ===\n"))
+cat(sprintf("Variables with >20%% missing: %d\n", length(high_missing_vars)))
+if(length(high_missing_vars) > 0) {
+  cat("High missing variables:", paste(high_missing_vars, collapse = ", "), "\n")
+}
+
+cat(sprintf("Variables with 5-20%% missing: %d\n", length(moderate_missing_vars)))
+if(length(moderate_missing_vars) > 0) {
+  cat("Moderate missing variables:", paste(moderate_missing_vars, collapse = ", "), "\n")
+}
+
+# Missing data visualization
+par(mfrow = c(1, 2), mar = c(10, 4, 3, 2))
+
+# Top 15 variables by missing percentage
+top_missing <- head(missing_summary, 15)
+barplot(top_missing$Missing_Pct, 
+        names.arg = substr(top_missing$Variable, 1, 8), 
+        main = "Top 15 Variables by Missing %", 
+        ylab = "Missing Percentage",
+        col = ifelse(top_missing$Missing_Pct > 20, "red", 
+                    ifelse(top_missing$Missing_Pct > 5, "orange", "lightblue")),
+        las = 2,
+        cex.names = 0.6)
+
+# Missing data heatmap (top 20 variables)
+if(require(VIM, quietly = TRUE)) {
+  top_20_vars <- head(missing_summary$Variable, 20)
+  aggr(data[, top_20_vars], 
+       col = c('lightblue', 'red'), 
+       numbers = TRUE, 
+       sortVars = TRUE)
+}
+
+par(mfrow = c(1, 1))
+```
+
+This code chunk conducts geographical and temporal analyses to understand the spatial and time-based distribution of the avalanche forecast data. This section examines observation counts across different forecasting areas, creates summary tables showing area-specific statistics, and calculates geographic coverage using latitude and longitude coordinates for each region. 
+
+Bar plots and pie charts visualize the distribution of observations across areas to identify potential geographic biases or data concentration patterns. The temporal analysis converts date fields and examines the dataset's time span, calculating yearly and monthly distributions to assess seasonal patterns typical in avalanche forecasting. 
+
+Time series visualizations including daily observation counts, annual trends, and monthly patterns help identify data collection consistency and seasonal variations. The analysis concludes with data consistency metrics including mean annual observations, standard deviation, and coefficient of variation to evaluate temporal data quality.
+
+```{r}
+
+# GEOGRAPHICAL ANALYSIS
+
+cat("\n GEOGRAPHICAL ANALYSIS \n")
+
+if("Area" %in% colnames(data)) {
+  # Area distribution
+  area_distribution <- table(data$Area)
+  area_summary <- data.frame(
+    Area = names(area_distribution),
+    Count = as.numeric(area_distribution),
+    Percentage = round(as.numeric(prop.table(area_distribution) * 100), 2),
+    stringsAsFactors = FALSE
+  ) %>%
+    arrange(desc(Count))
+  
+  cat("Observations by Forecasting Area:\n")
+  print(kable(area_summary, caption = "Distribution of Observations by Area") %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+  
+  # Geographic spread analysis
+  if(all(c("latitude", "longitude") %in% colnames(data))) {
+    geo_summary <- data %>%
+      filter(!is.na(latitude) & !is.na(longitude) & !is.na(Area)) %>%
+      group_by(Area) %>%
+      summarise(
+        Observations = n(),
+        Min_Lat = round(min(latitude, na.rm = TRUE), 3),
+        Max_Lat = round(max(latitude, na.rm = TRUE), 3),
+        Mean_Lat = round(mean(latitude, na.rm = TRUE), 3),
+        Min_Lon = round(min(longitude, na.rm = TRUE), 3),
+        Max_Lon = round(max(longitude, na.rm = TRUE), 3),
+        Mean_Lon = round(mean(longitude, na.rm = TRUE), 3),
+        .groups = 'drop'
+      ) %>%
+      arrange(desc(Observations))
+    
+    cat("\nGeographic Spread by Area:\n")
+    print(kable(geo_summary, caption = "Geographic Coverage by Forecasting Area") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+  }
+  
+  # Area visualization
+  par(mfrow = c(1, 2), mar = c(8, 4, 3, 2))
+  
+  # Top areas bar plot
+  top_areas <- head(area_summary, 10)
+  barplot(top_areas$Count, 
+          names.arg = substr(top_areas$Area, 1, 10), 
+          main = "Top 10 Areas by Observation Count", 
+          ylab = "Count",
+          col = rainbow(nrow(top_areas)),
+          las = 2,
+          cex.names = 0.7)
+  
+  # Area distribution pie chart (top 8 + others)
+  if(nrow(area_summary) > 8) {
+    top_8_areas <- head(area_summary, 8)
+    other_count <- sum(tail(area_summary$Count, -8))
+    pie_data <- c(top_8_areas$Count, other_count)
+    pie_labels <- c(top_8_areas$Area, "Others")
+  } else {
+    pie_data <- area_summary$Count
+    pie_labels <- area_summary$Area
+  }
+  
+  pie(pie_data, 
+      labels = paste0(substr(pie_labels, 1, 10), "\n(", 
+                     round(pie_data/sum(pie_data)*100, 1), "%)"),
+      main = "Area Distribution",
+      col = rainbow(length(pie_data)))
+  
+  par(mfrow = c(1, 1))
+}
+
+
+# TEMPORAL ANALYSIS
+
+cat("\n=== TEMPORAL ANALYSIS ===\n")
+
+if("Date" %in% colnames(data)) {
+  # Convert date and handle missing values
+  data_with_dates <- data %>%
+    filter(!is.na(Date) & Date != "" & Date != "NA") %>%
+    mutate(Date = as.Date(Date))
+  
+  if(nrow(data_with_dates) > 0) {
+    # Time span analysis
+    date_range <- range(data_with_dates$Date, na.rm = TRUE)
+    total_days <- as.numeric(date_range[2] - date_range[1])
+    total_years <- round(total_days / 365.25, 1)
+    
+    cat(sprintf("Data Collection Time Span:\n"))
+    cat(sprintf("- Start date: %s\n", date_range[1]))
+    cat(sprintf("- End date: %s\n", date_range[2]))
+    cat(sprintf("- Total period: %.1f years (%d days)\n", total_years, total_days))
+    
+    # Yearly distribution
+    data_with_dates$Year <- year(data_with_dates$Date)
+    yearly_counts <- table(data_with_dates$Year)
+    
+    yearly_summary <- data.frame(
+      Year = as.numeric(names(yearly_counts)),
+      Count = as.numeric(yearly_counts),
+      Percentage = round(as.numeric(prop.table(yearly_counts) * 100), 2),
+      stringsAsFactors = FALSE
+    )
+    
+    cat("\nObservations by Year:\n")
+    print(kable(yearly_summary, caption = "Annual Distribution of Observations") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    
+    # Monthly distribution
+    data_with_dates$Month <- month(data_with_dates$Date)
+    monthly_counts <- table(data_with_dates$Month)
+    month_names <- month.name[as.numeric(names(monthly_counts))]
+    
+    monthly_summary <- data.frame(
+      Month = month_names,
+      Count = as.numeric(monthly_counts),
+      Percentage = round(as.numeric(prop.table(monthly_counts) * 100), 2),
+      stringsAsFactors = FALSE
+    )
+    
+    cat("\nObservations by Month:\n")
+    print(kable(monthly_summary, caption = "Monthly Distribution of Observations") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    
+    # Temporal visualizations
+    par(mfrow = c(2, 2), mar = c(8, 4, 3, 2))
+    
+    # Yearly distribution
+    barplot(yearly_counts, 
+            main = "Observations by Year", 
+            ylab = "Count",
+            col = "lightblue",
+            las = 2)
+    
+    # Monthly distribution
+    barplot(monthly_counts, 
+            names.arg = substr(month_names, 1, 3),
+            main = "Observations by Month", 
+            ylab = "Count",
+            col = "lightgreen",
+            las = 2)
+    
+    # Time series plot
+    daily_counts <- data_with_dates %>%
+      count(Date) %>%
+      arrange(Date)
+    
+    plot(daily_counts$Date, daily_counts$n, 
+         type = "l", 
+         main = "Daily Observation Count Over Time",
+         xlab = "Date", 
+         ylab = "Daily Count",
+         col = "blue")
+    
+    # Data consistency check
+    consistency_stats <- yearly_summary %>%
+      summarise(
+        Mean_Annual = round(mean(Count), 1),
+        SD_Annual = round(sd(Count), 1),
+        CV_Annual = round(sd(Count)/mean(Count), 3)
+      )
+    
+    plot(yearly_summary$Year, yearly_summary$Count,
+         type = "b",
+         main = "Annual Data Consistency",
+         xlab = "Year",
+         ylab = "Annual Count",
+         col = "red",
+         pch = 16)
+    abline(h = consistency_stats$Mean_Annual, col = "blue", lty = 2)
+    
+    cat(sprintf("\nData Consistency Metrics:\n"))
+    cat(sprintf("- Mean annual observations: %.1f\n", consistency_stats$Mean_Annual))
+    cat(sprintf("- Standard deviation: %.1f\n", consistency_stats$SD_Annual))
+    cat(sprintf("- Coefficient of variation: %.3f\n", consistency_stats$CV_Annual))
+    
+    par(mfrow = c(1, 1))
+  }
+}
+```
+This code chunk assesses data quality through duplicate detection and forecast accuracy analysis. It identifies duplicate rows in the dataset and calculates their percentage. The chunk then performs a comprehensive comparison between forecast avalanche hazard (FAH) and observed avalanche hazard (OAH). A confusion matrix displays the relationship between predicted and actual hazard levels, while accuracy metrics are calculated for each risk level to identify patterns in forecasting performance. Visualizations include bar charts showing accuracy by hazard level and overall forecast performance.
+
+```{r}
+
+# DATA QUALITY ASSESSMENT
+
+cat("\n=== DATA QUALITY ASSESSMENT ===\n")
+
+# Duplicate detection
+duplicate_rows <- sum(duplicated(data))
+cat(sprintf("Duplicate Observations: %d (%.2f%%)\n", duplicate_rows, duplicate_rows/nrow(data)*100))
+
+# OAH vs FAH comparison (forecast vs observed avalanche hazard)
+if(all(c("OAH", "FAH") %in% colnames(data))) {
+  # Clean both variables
+  comparison_data <- data %>%
+    filter(!is.na(FAH) & FAH != "" & FAH != "NA" &
+           !is.na(OAH) & OAH != "" & OAH != "NA") %>%
+    mutate(
+      FAH_clean = str_trim(str_to_title(FAH)),
+      OAH_clean = str_trim(str_to_title(OAH))
+    )
+  
+  if(nrow(comparison_data) > 0) {
+    # Accuracy calculation
+    forecast_accuracy <- mean(comparison_data$FAH_clean == comparison_data$OAH_clean, na.rm = TRUE)
+    
+    cat(sprintf("\nForecast vs Observed Comparison:\n"))
+    cat(sprintf("- Paired observations: %d\n", nrow(comparison_data)))
+    cat(sprintf("- Forecast accuracy: %.2f%%\n", forecast_accuracy * 100))
+    
+    # Confusion matrix for forecast vs observed
+    confusion_fah_oah <- table(Forecast = comparison_data$FAH_clean, 
+                               Observed = comparison_data$OAH_clean)
+    
+    cat("\nForecast vs Observed Confusion Matrix:\n")
+    print(confusion_fah_oah)
+    
+    # Accuracy by risk level
+    accuracy_by_level <- comparison_data %>%
+      group_by(FAH_clean) %>%
+      summarise(
+        Count = n(),
+        Correct = sum(FAH_clean == OAH_clean),
+        Accuracy = round(mean(FAH_clean == OAH_clean) * 100, 2),
+        .groups = 'drop'
+      ) %>%
+      arrange(desc(Count))
+    
+    cat("\nForecast Accuracy by Risk Level:\n")
+    print(kable(accuracy_by_level, caption = "Forecast Accuracy by FAH Level") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    
+    # Visualization
+    par(mfrow = c(1, 2), mar = c(8, 4, 3, 2))
+    
+    # Accuracy by level
+    barplot(accuracy_by_level$Accuracy,
+            names.arg = substr(accuracy_by_level$FAH_clean, 1, 8),
+            main = "Forecast Accuracy by Level",
+            ylab = "Accuracy (%)",
+            col = "skyblue",
+            las = 2,
+            cex.names = 0.7)
+    
+    # Overall accuracy visualization
+    accuracy_data <- c(forecast_accuracy * 100, (1 - forecast_accuracy) * 100)
+    names(accuracy_data) <- c("Correct", "Incorrect")
+    barplot(accuracy_data,
+            main = "Overall Forecast Accuracy",
+            ylab = "Percentage",
+            col = c("lightgreen", "lightcoral"))
+    
+    par(mfrow = c(1, 1))
+  }
+}
+
+```
+
+This code chunk analyzes relationships between numeric variables through correlation analysis to identify potential multicollinearity issues. The analysis computes pairwise correlations using complete observations, identifies highly correlated variable pairs with absolute correlation coefficients above 0.7, and flags potential multicollinearity problems where correlations exceed 0.9. Summary tables display the most correlated variable pairs ranked by correlation strength. A correlation matrix heatmap visualizes the relationships between variables (limited to the top 20 most important variables for readability).
+
+
+```{r}
+
+# FEATURE RELATIONSHIP ANALYSIS
+
+cat("\n=== FEATURE RELATIONSHIP ANALYSIS ===\n")
+
+# Correlation analysis for numeric variables
+if(length(numeric_vars) > 1) {
+  # Prepare numeric data for correlation
+  numeric_data_clean <- data[, numeric_vars, drop = FALSE]
+  for(col in names(numeric_data_clean)) {
+    numeric_data_clean[[col]] <- as.numeric(ifelse(numeric_data_clean[[col]] == "NA", NA, numeric_data_clean[[col]]))
+  }
+  
+  # Calculate correlation matrix
+  cor_matrix <- cor(numeric_data_clean, use = "pairwise.complete.obs")
+  
+  # Find highly correlated pairs (>0.7 or <-0.7)
+  high_cor_pairs <- which(abs(cor_matrix) > 0.7 & cor_matrix != 1, arr.ind = TRUE)
+  
+  if(nrow(high_cor_pairs) > 0) {
+    high_cor_df <- data.frame(
+      Variable1 = rownames(cor_matrix)[high_cor_pairs[,1]],
+      Variable2 = colnames(cor_matrix)[high_cor_pairs[,2]],
+      Correlation = round(cor_matrix[high_cor_pairs], 3),
+      stringsAsFactors = FALSE
+    )
+    
+    # Remove duplicate pairs
+    high_cor_df <- high_cor_df[high_cor_df$Variable1 < high_cor_df$Variable2, ]
+    high_cor_df <- high_cor_df[order(abs(high_cor_df$Correlation), decreasing = TRUE), ]
+    
+    cat("Highly Correlated Variable Pairs (|r| > 0.7):\n")
+    print(kable(high_cor_df, caption = "Highly Correlated Variable Pairs") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    
+    # Multicollinearity assessment
+    very_high_cor <- high_cor_df[abs(high_cor_df$Correlation) > 0.9, ]
+    if(nrow(very_high_cor) > 0) {
+      cat("\nPotential Multicollinearity Issues (|r| > 0.9):\n")
+      print(kable(very_high_cor, caption = "Variables with Potential Multicollinearity") %>%
+        kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    }
+  } else {
+    cat("No highly correlated variable pairs found (|r| > 0.7)\n")
+  }
+  
+  # Correlation visualization
+  if(corrplot_available) {
+    # Select top variables for visualization (max 20 for readability)
+    if(ncol(cor_matrix) > 20) {
+      # Select variables with highest variance or most correlations
+      var_importance <- rowSums(abs(cor_matrix), na.rm = TRUE)
+      top_vars <- names(sort(var_importance, decreasing = TRUE)[1:20])
+      cor_matrix_subset <- cor_matrix[top_vars, top_vars]
+    } else {
+      cor_matrix_subset <- cor_matrix
+    }
+    
+    corrplot(cor_matrix_subset, 
+             method = "color",
+             type = "upper",
+             order = "hclust",
+             tl.cex = 0.7,
+             tl.col = "black",
+             title = "Correlation Matrix Heatmap",
+             mar = c(0, 0, 2, 0))
+  }
+}
+
+```
+
+This code chunk performs outlier detection across all numeric variables using the Interquartile Range (IQR) method to identify extreme values. The chunk calculates quartiles, IQR bounds, and outlier thresholds (Q1-1.5×IQR and Q3+1.5×IQR) for each variable, then counts observations falling outside these bounds. A comprehensive summary table displays outlier statistics including counts and percentages, sorted by outlier prevalence to prioritize variables requiring attention. The chunk identifies variables with high outlier rates (>5%) that may need preprocessing such as transformation, capping, or removal before model training. Box plots visualize the top six variables with the highest outlier percentages, highlighting extreme values in red to provide intuitive understanding of data distribution issues that could impact neural network performance and convergence.
+
+```{r}
+
+# OUTLIER ANALYSIS
+
+cat("\n=== OUTLIER ANALYSIS ===\n")
+
+# Outlier detection for numeric variables using IQR method
+outlier_summary <- data.frame(
+  Variable = character(),
+  Total_Obs = numeric(),
+  Valid_Obs = numeric(),
+  Q1 = numeric(),
+  Q3 = numeric(),
+  IQR = numeric(),
+  Lower_Bound = numeric(),
+  Upper_Bound = numeric(),
+  Outliers = numeric(),
+  Outlier_Pct = numeric(),
+  stringsAsFactors = FALSE
+)
+
+numeric_data_for_outliers <- data[, numeric_vars, drop = FALSE]
+for(col in names(numeric_data_for_outliers)) {
+  numeric_data_for_outliers[[col]] <- as.numeric(ifelse(numeric_data_for_outliers[[col]] == "NA", NA, numeric_data_for_outliers[[col]]))
+}
+
+for(var in numeric_vars) {
+  if(var %in% colnames(numeric_data_for_outliers)) {
+    values <- numeric_data_for_outliers[[var]]
+    valid_values <- values[!is.na(values)]
+    
+    if(length(valid_values) > 0) {
+      Q1 <- quantile(valid_values, 0.25)
+      Q3 <- quantile(valid_values, 0.75)
+      IQR_val <- Q3 - Q1
+      lower_bound <- Q1 - 1.5 * IQR_val
+      upper_bound <- Q3 + 1.5 * IQR_val
+      
+      outliers <- sum(valid_values < lower_bound | valid_values > upper_bound)
+      outlier_pct <- round(outliers / length(valid_values) * 100, 2)
+      
+      outlier_summary <- rbind(outlier_summary, data.frame(
+        Variable = var,
+        Total_Obs = length(values),
+        Valid_Obs = length(valid_values),
+        Q1 = round(Q1, 3),
+        Q3 = round(Q3, 3),
+        IQR = round(IQR_val, 3),
+        Lower_Bound = round(lower_bound, 3),
+        Upper_Bound = round(upper_bound, 3),
+        Outliers = outliers,
+        Outlier_Pct = outlier_pct,
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+}
+
+# Sort by outlier percentage
+outlier_summary <- outlier_summary[order(outlier_summary$Outlier_Pct, decreasing = TRUE), ]
+
+cat("Outlier Analysis Summary:\n")
+print(kable(outlier_summary, caption = "Outlier Detection Results (IQR Method)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+
+# Identify variables with high outlier rates
+high_outlier_vars <- outlier_summary$Variable[outlier_summary$Outlier_Pct > 5]
+cat(sprintf("\nVariables with >5%% outliers: %d\n", length(high_outlier_vars)))
+if(length(high_outlier_vars) > 0) {
+  cat("High outlier variables:", paste(high_outlier_vars, collapse = ", "), "\n")
+}
+
+# Outlier visualization - box plots for top outlier variables
+if(nrow(outlier_summary) > 0) {
+  top_outlier_vars <- head(outlier_summary$Variable, 6)
+  
+  par(mfrow = c(2, 3), mar = c(8, 4, 3, 2))
+  
+  for(var in top_outlier_vars) {
+    if(var %in% colnames(numeric_data_for_outliers)) {
+      values <- numeric_data_for_outliers[[var]]
+      boxplot(values, 
+              main = paste("Outliers in", var),
+              ylab = var,
+              col = "lightblue",
+              outcol = "red",
+              outcex = 0.5)
+    }
+  }
+  
+  par(mfrow = c(1, 1))
+}
+```
+
+The coding chunk below provides a basic summary of the EDA findings.
+
+```{r}
+# EDA SUMMARY
+cat("\n=== KEY FINDINGS SUMMARY ===\n")
+cat(sprintf("- Total observations: %d\n", nrow(data)))
+cat(sprintf("- Variables: %d (%d numeric, %d categorical)\n", 
+            ncol(data), length(numeric_vars), length(categorical_vars)))
+cat(sprintf("- Missing FAH: %.1f%%\n", fah_missing_pct))
+cat(sprintf("- Duplicate rows: %d\n", duplicate_rows))
+if(exists("forecast_accuracy")) {
+  cat(sprintf("- Forecast accuracy: %.1f%%\n", forecast_accuracy * 100))
+}
+if(exists("high_cor_pairs") && nrow(high_cor_pairs) > 0) {
+  cat(sprintf("- High correlations: %d pairs\n", nrow(high_cor_df)))
+}
+if(nrow(outlier_summary) > 0) {
+  cat(sprintf("- Variables with >5%% outliers: %d\n", length(high_outlier_vars)))
+}
+
+# Clean up large objects to save memory
+rm(list = c("numeric_data", "numeric_data_clean", "numeric_data_for_outliers", 
+            "comparison_data", "data_with_dates"))
+if(exists("cor_matrix")) rm(cor_matrix)
+if(exists("cor_matrix_subset")) rm(cor_matrix_subset)
+
+gc()  # Garbage collection
+
+```
+This section of the Model now starts with data preprocessing. For good measure, the data set is reloaded. 
+
+This chunk handles the initial data preprocessing steps for the dataset. This chunk begin by loading the raw data and removing the OAH (observed avalanche hazard) and Obs (observer) columns since our objective is to predict the forecasted avalanche hazard (FAH) rather than the observed outcomes. The chunk then filters out observations with missing or invalid FAH values, as these represent our target variable. To ensure consistency in the categorical target variable, we standardize the FAH values by trimming whitespace, normalizing case formatting, and mapping various text representations to five standard avalanche hazard levels: Low, Moderate, Considerable -, Considerable +, and High. Finally, we assess missing data patterns across all remaining variables and remove columns with more than 20% missing values to maintain data quality for our neural network model. This preprocessing ensures we have a clean dataset with a properly formatted target variable and reduces potential issues from excessive missing data in predictor variables.
+
+
+
+```{r}
+
+# DATA PREPROCESSING
+data <- read.csv("scotland_avalanche_forecasts_2009_2025.csv", stringsAsFactors = FALSE)
+
+cat("\n=== DATA PREPROCESSING ===\n")
+
+# Drop OAH (actual observations) and Obs (observer) columns
+columns_to_drop <- c("OAH", "Obs")
+data <- data %>% select(-all_of(columns_to_drop))
+
+# Remove observations with missing FAH
+data_clean <- data %>% 
+  filter(!is.na(FAH) & FAH != "" & FAH != "NA")
+
+cat("Observations after removing missing FAH:", nrow(data_clean), "\n")
+
+# Properly examine and clean FAH values
+cat("\nUnique FAH values found:\n")
+unique_fah <- unique(data_clean$FAH)
+print(unique_fah)
+
+# Clean FAH values - handle case sensitivity and variations
+data_clean$FAH <- str_trim(data_clean$FAH)  # Remove whitespace
+data_clean$FAH <- str_to_title(data_clean$FAH)  # Standardize case
+
+# Map variations to standard levels
+data_clean$FAH <- case_when(
+  str_detect(tolower(data_clean$FAH), "^low") ~ "Low",
+  str_detect(tolower(data_clean$FAH), "^moderate") ~ "Moderate", 
+  str_detect(tolower(data_clean$FAH), "considerable.*-|considerable.*minus") ~ "Considerable -",
+  str_detect(tolower(data_clean$FAH), "considerable.*\\+|considerable.*plus") ~ "Considerable +",
+  str_detect(tolower(data_clean$FAH), "^high") ~ "High",
+  TRUE ~ data_clean$FAH
+)
+
+# Check cleaned FAH distribution
+cat("\nCleaned FAH distribution:\n")
+print(table(data_clean$FAH, useNA = "always"))
+
+# Remove any remaining unmapped values
+valid_fah_levels <- c("Low", "Moderate", "Considerable -", "Considerable +", "High")
+data_clean <- data_clean %>% 
+  filter(FAH %in% valid_fah_levels)
+
+cat("Final observations with valid FAH:", nrow(data_clean), "\n")
+cat("Final FAH distribution:\n")
+print(table(data_clean$FAH))
+
+# Check missing value percentages for all columns
+missing_percentages <- data_clean %>%
+  summarise_all(~sum(is.na(.) | . == "" | . == "NA") / length(.) * 100) %>%
+  gather(key = "Variable", value = "Missing_Percentage") %>%
+  arrange(desc(Missing_Percentage))
+
+print(missing_percentages)
+
+# Drop columns with >20% missing values
+high_missing_threshold <- 20
+high_missing_cols <- missing_percentages %>%
+  filter(Missing_Percentage > high_missing_threshold) %>%
+  pull(Variable)
+
+if(length(high_missing_cols) > 0) {
+  data_clean <- data_clean %>% select(-all_of(high_missing_cols))
+  cat("Dropped high-missing columns:", paste(high_missing_cols, collapse = ", "), "\n")
+}
+
+```
+
+This chunk performs comprehensive outlier detection and removal to ensure data quality for the neural network model. It begins by converting string representations of missing values to proper NA values for all numeric variables. The approach combines statistical outlier detection using the Interquartile Range (IQR) method with domain-specific knowledge about physically plausible ranges for avalanche forecasting variables. For variables like altitude, wind speeds, snow depth, temperature, and penetration measurements, we apply IQR-based outlier removal with a threshold of 2.5 standard deviations to eliminate extreme statistical outliers while preserving legitimate extreme weather events. Additionally, we implement domain-specific constraints to remove physically impossible values: aspect measurements exceeding 360 degrees (compass directions), cloud cover outside the 0-100% range, and slope inclines greater than 90 degrees or negative values. This dual approach ensures that our dataset contains only realistic measurements that are appropriate for training a predictive model of avalanche conditions in Scottish mountains.
+
+```{r}
+# OUTLIER DETECTION AND REMOVAL
+
+#Altitude (Alt) - removed via IQR method
+
+#Problem: Two observations have impossible values (244,859m and 77,044m)
+#Context: Scotland's highest peak (Ben Nevis) is 1,345m
+#Action: Remove these observations
+
+#Aspect - Not removed via iqr - removed specifically
+
+#Problem: Values exceeding 163,770 degrees (impossible for compass directions)
+#Context: Aspect should be 0-360 degrees
+#Action: Remove observations with Aspect > 360
+
+#Wind Speed - removed via iqr method
+
+#Current range: -2 to 290 km/h
+#Outlier cap:  remove negative values and cap at 250
+#Rationale: Winds >200 km/h are hurricane-force and extremely rare in Scottish mountains
+
+#Summit Wind Speed - removed via iqr method
+
+#Current range: -8 to 360 km/h
+#Outlier threshold: remove negative values and cap at 300
+#Rationale: Summit winds can be stronger but >300 km/h values are likely errors
+
+#Total Snow Depth - removed via iqr method
+
+#Current range: -1 to 3,000cm (30 meters!)
+#Outlier cap: > remove negative values and cap at 1200cm
+#Rationale: Snow depths >10m are extremely rare and likely measurement errors
+
+#Cloud Cover - not removed via iqr method - special removal
+
+#Current range: -1 to 199%
+#Issue: Values >100% and negative values
+#Outlier cap: 0% to 100% (remove impossible values)
+
+#Foot Penetration & Ski Penetration - removed via iqr
+
+#Foot Pen range: -1 to 300cm
+#Ski Pen range: -1 to 55cm
+#Action: Cap negative values at 0
+
+#Incline - not removed via iqr method - special removal
+
+#Range: -1 to 1,020 degrees
+#Issue: Slopes >90° are overhangs (possible but rare)
+#Recommended cap: remove negative values and values over 180
+
+cat("\n=== OUTLIER Removal ===\n")
+
+# Convert character "NA" to actual NA for numeric columns
+numeric_cols <- c("Alt", "Aspect", "Wind.Speed", "Summit.Wind.Speed", 
+                  "Total.Snow.Depth", "Cloud", "Foot.Pen", "Incline",
+                  "Air.Temp", "Summit.Air.Temp", "Max.Temp.Grad", 
+                  "Max.Hardness.Grad", "No.Settle", "Snow.Index", 
+                  "Insolation", "Crystals", "Wetness", "Snow.Temp")
+
+for(col in numeric_cols) {
+  if(col %in% colnames(data_clean)) {
+    data_clean[[col]] <- as.numeric(ifelse(data_clean[[col]] == "NA", NA, data_clean[[col]]))
+  }
+}
+
+# robust outlier detection using IQR method
+remove_outliers_iqr <- function(data, col_name, k = 3) {
+  if(col_name %in% colnames(data)) {
+    values <- data[[col_name]]
+    Q1 <- quantile(values, 0.25, na.rm = TRUE)
+    Q3 <- quantile(values, 0.75, na.rm = TRUE)
+    IQR <- Q3 - Q1
+    lower_bound <- Q1 - k * IQR
+    upper_bound <- Q3 + k * IQR
+    
+    outliers <- sum(!is.na(values) & (values < lower_bound | values > upper_bound), na.rm = TRUE)
+    data <- data %>% filter(is.na(.data[[col_name]]) | 
+                           (.data[[col_name]] >= lower_bound & .data[[col_name]] <= upper_bound))
+    cat("Removed", outliers, "outliers from", col_name, "\n")
+    return(data)
+  }
+  return(data)
+}
+
+original_count <- nrow(data_clean)
+
+# Apply IQR-based outlier removal to key variables
+outlier_cols <- c("Alt", "Wind.Speed", "Summit.Wind.Speed", "Total.Snow.Depth", 
+                  "Air.Temp", "Summit.Air.Temp", "Foot.Pen")
+
+for(col in outlier_cols) {
+  data_clean <- remove_outliers_iqr(data_clean, col, k = 3.5)
+}
+
+# Domain-specific outlier removal
+# Aspect
+# Problem: Values exceeding 163,770 degrees (impossible for compass directions)
+# Context: Aspect should be 0-360 degrees
+# Action: Remove observations with Aspect > 360
+if("Aspect" %in% colnames(data_clean)) {
+  aspect_outliers <- sum(!is.na(data_clean$Aspect) & data_clean$Aspect > 360, na.rm = TRUE)
+  data_clean <- data_clean %>% filter(is.na(Aspect) | Aspect <= 360)
+  cat("Removed aspect outliers:", aspect_outliers, "\n")
+}
+
+#Cloud Cover
+#Current range: -1 to 199%
+#Issue: Values >100% and negative values
+#Outlier cap: 0% to 100% (remove impossible values)
+if("Cloud" %in% colnames(data_clean)) {
+  cloud_outliers <- sum(!is.na(data_clean$Cloud) & (data_clean$Cloud < 0 | data_clean$Cloud > 100), na.rm = TRUE)
+  data_clean <- data_clean %>% filter(is.na(Cloud) | (Cloud >= 0 & Cloud <= 100))
+  cat("Removed cloud cover outliers:", cloud_outliers, "\n")
+}
+
+#Incline
+#Range: -1 to 1,020 degrees
+#Issue: Slopes >90° are overhangs (possible but rare)
+#cap: remove negative values and values over 180
+if("Incline" %in% colnames(data_clean)) {
+  incline_outliers <- sum(!is.na(data_clean$Incline) & (data_clean$Incline < 0 | data_clean$Incline > 90), na.rm = TRUE)
+  data_clean <- data_clean %>% filter(is.na(Incline) | (Incline >= 0 & Incline <= 90))
+  cat("Removed incline outliers:", incline_outliers, "\n")
+}
+
+cat("Total observations removed due to outliers:", original_count - nrow(data_clean), "\n")
+outlier_removal_percentage <- ((original_count - nrow(data_clean)) / original_count) * 100
+cat("Percentage of dataset removed due to outliers:", round(outlier_removal_percentage, 2), "%\n")
+
+```
+This chunk performs feature engineering to create new variables that may improve our neural network's predictive performance by capturing important relationships and patterns in the avalanche forecast data. We generate several interaction features that combine existing variables in meteorologically meaningful ways: a wind chill index that accounts for the cooling effect of wind on air temperature, a temperature gradient between summit and base elevations that indicates atmospheric stability, and a snow-altitude interaction term that captures how snow accumulation varies with elevation. 
+
+The aspect (slope direction) is transformed from a single angular measurement into two orthogonal components (north-south and east-west) using trigonometric functions, which better represents the circular nature of compass directions for machine learning algorithms. 
+
+Finally, we extract temporal features from the date variable, including month, day of year, and season, which can capture seasonal patterns in avalanche risk that are crucial for accurate forecasting. These engineered features provide the model with additional context about weather interactions, topographic influences, and seasonal dynamics that are fundamental to avalanche formation.
+
+```{r}
+
+# FEATURE ENGINEERING
+
+cat("\n=== FEATURE ENGINEERING ===\n")
+
+# Create interaction features
+if(all(c("Air.Temp", "Wind.Speed") %in% colnames(data_clean))) {
+  data_clean$Wind_Chill <- data_clean$Air.Temp - (data_clean$Wind.Speed * 0.6)
+}
+
+if(all(c("Summit.Air.Temp", "Air.Temp") %in% colnames(data_clean))) {
+  data_clean$Temp_Gradient <- data_clean$Summit.Air.Temp - data_clean$Air.Temp
+}
+
+if(all(c("Total.Snow.Depth", "Alt") %in% colnames(data_clean))) {
+  data_clean$Snow_Alt_Interaction <- data_clean$Total.Snow.Depth * (data_clean$Alt / 1000)
+}
+
+if("Aspect" %in% colnames(data_clean)) {
+  # Convert aspect to cardinal directions
+  data_clean$Aspect_North <- cos(data_clean$Aspect * pi / 180)
+  data_clean$Aspect_East <- sin(data_clean$Aspect * pi / 180)
+}
+
+# Create temporal features from date
+if("Date" %in% colnames(data_clean)) {
+  data_clean$Date <- as.Date(data_clean$Date)
+  data_clean$Month <- as.numeric(month(data_clean$Date))
+  data_clean$Day_of_Year <- as.numeric(yday(data_clean$Date))
+  data_clean$Season <- case_when(
+    month(data_clean$Date) %in% c(12, 1, 2) ~ "Winter",
+    month(data_clean$Date) %in% c(3, 4, 5) ~ "Spring",
+    month(data_clean$Date) %in% c(6, 7, 8) ~ "Summer",
+    TRUE ~ "Autumn"
+  )
+}
+
+cat("Added engineered features\n")
+
+```
+This chunk implements a multi-level imputation strategy to handle missing values in our dataset while preserving the underlying patterns that are important for avalanche forecasting. The approach uses contextual imputation by first grouping observations by Area and Season, recognizing that avalanche conditions vary significantly across different Scottish regions and times of year. Furthermore, this approach is supported by the fact that our missing value analysis in EDA noted that missing values were concentrated for certain seasons. 
+
+Within each group, missing numeric values are imputed using the group median (which is more robust to outliers than the mean), while categorical variables are imputed using the group mode (most frequent value). This ensures that imputed values reflect the typical conditions for that specific region and season rather than global averages that might not be representative. 
+
+For any remaining missing values after group-based imputation, we apply global imputation using overall dataset medians and modes as fallback values. 
+
+We exclude non-predictive variables like Date, OSgrid, Location, and our target variable FAH from the imputation process to prevent data leakage and maintain the integrity of our prediction target. This hierarchical imputation strategy helps preserve the regional and seasonal meteorological patterns that are crucial for accurate avalanche hazard prediction.
+
+```{r}
+
+# IMPUTATION
+
+cat("\n=== IMPUTATION ===\n")
+
+# More sophisticated imputation using multiple strategies
+impute_advanced <- function(data) {
+  # Remove non-predictive columns for imputation
+  cols_to_exclude <- c("Date", "OSgrid", "Location", "FAH")
+  imputation_data <- data %>% select(-all_of(cols_to_exclude[cols_to_exclude %in% colnames(data)]))
+  
+  # Group-based imputation (by Area and Season)
+  grouping_vars <- intersect(c("Area", "Season"), colnames(data))
+  
+  if(length(grouping_vars) > 0) {
+    # Create grouping combinations
+    groups <- data %>% 
+      select(all_of(grouping_vars)) %>%
+      unite("group", all_of(grouping_vars), sep = "_", remove = FALSE) %>%
+      pull(group)
+    
+    unique_groups <- unique(groups)
+    
+    for(group in unique_groups) {
+      group_mask <- groups == group
+      
+      # Numeric imputation with group median
+      numeric_vars <- names(imputation_data)[sapply(imputation_data, is.numeric)]
+      for(var in numeric_vars) {
+        if(var %in% colnames(data)) {
+          group_values <- data[group_mask, var]
+          group_median <- median(group_values, na.rm = TRUE)
+          if(!is.na(group_median)) {
+            data[group_mask & is.na(data[[var]]), var] <<- group_median
+          }
+        }
+      }
+      
+      # Categorical imputation with group mode
+      categorical_vars <- names(imputation_data)[!sapply(imputation_data, is.numeric)]
+      for(var in categorical_vars) {
+        if(var %in% colnames(data) && var != "FAH") {
+          group_values <- data[group_mask, var]
+          group_values <- group_values[!is.na(group_values) & group_values != "" & group_values != "NA"]
+          if(length(group_values) > 0) {
+            group_mode <- names(sort(table(group_values), decreasing = TRUE))[1]
+            data[group_mask & (is.na(data[[var]]) | data[[var]] == "" | data[[var]] == "NA"), var] <<- group_mode
+          }
+        }
+      }
+    }
+  }
+  
+  # Global imputation for remaining missing values
+  for(var in names(imputation_data)) {
+    if(var %in% colnames(data) && var != "FAH") {
+      if(is.numeric(data[[var]])) {
+        global_median <- median(data[[var]], na.rm = TRUE)
+        if(!is.na(global_median)) {
+          data[is.na(data[[var]]), var] <<- global_median
+        }
+      } else {
+        non_missing <- data[[var]][!is.na(data[[var]]) & data[[var]] != "" & data[[var]] != "NA"]
+        if(length(non_missing) > 0) {
+          global_mode <- names(sort(table(non_missing), decreasing = TRUE))[1]
+          data[is.na(data[[var]]) | data[[var]] == "" | data[[var]] == "NA", var] <<- global_mode
+        }
+      }
+    }
+  }
+}
+
+impute_advanced(data_clean)
+
+```
+
+
+This chunk handles target variable encoding and comprehensive feature encoding to prepare the data for neural network training. We begin by removing non-predictive identifier columns (Date, OSgrid, Location) and then carefully encode our target variable (FAH) using proper ordinal encoding that respects the natural risk hierarchy of avalanche hazard levels from Low (0) to High (4). The encoding verification ensures all avalanche hazard categories are correctly mapped and no values are lost in translation. For categorical predictor variables, we implement a systematic approach that first cleans variable names to avoid parsing issues, then applies frequency-based filtering to retain only categories that appear at least 50 times in the dataset (grouping rare categories as "Other" to prevent overfitting). We then create one-hot encoded dummy variables for each categorical level, converting them to binary indicators that neural networks can effectively process. This encoding strategy maintains the interpretability of our target variable while transforming all categorical predictors into a format suitable for neural network computation, ensuring our model can learn from both the ordinal nature of avalanche risk and the categorical patterns in weather and terrain variables.
+
+```{r}
+
+# TARGET ENCODING 
+
+cat("\n=== TARGET ENCODING ===\n")
+
+# Drop non-predictive columns
+date_area_cols <- c("Date", "OSgrid", "Location")
+data_processed <- data_clean %>% select(-all_of(date_area_cols[date_area_cols %in% colnames(data_clean)]))
+
+# Define exact FAH levels in proper risk order (0-based for neural networks)
+fah_levels <- c("Low", "Moderate", "Considerable -", "Considerable +", "High")
+
+# Verify all FAH values are in expected levels
+cat("Expected FAH levels:", paste(fah_levels, collapse = ", "), "\n")
+cat("Actual FAH levels in data:", paste(sort(unique(data_processed$FAH)), collapse = ", "), "\n")
+
+# Check for any unmapped values BEFORE encoding
+unmapped_values <- setdiff(unique(data_processed$FAH), fah_levels)
+if(length(unmapped_values) > 0) {
+  cat("WARNING: Unmapped FAH values found:", paste(unmapped_values, collapse = ", "), "\n")
+  # Remove unmapped values
+  data_processed <- data_processed %>% filter(FAH %in% fah_levels)
+  cat("Removed unmapped values. New size:", nrow(data_processed), "\n")
+}
+
+# Create proper ordinal encoding (0-4 for 5 classes)
+data_processed$FAH_encoded <- as.numeric(factor(data_processed$FAH, 
+                                               levels = fah_levels,
+                                               ordered = TRUE)) - 1  # Convert to 0-based
+
+# Verify encoding
+cat("\nTarget encoding verification:\n")
+encoding_check <- data_processed %>% 
+  select(FAH, FAH_encoded) %>% 
+  distinct() %>% 
+  arrange(FAH_encoded)
+print(encoding_check)
+
+cat("\nFinal target distribution (encoded):\n")
+print(table(data_processed$FAH_encoded))
+
+# Ensure no missing encoded values
+if(any(is.na(data_processed$FAH_encoded))) {
+  cat("ERROR: Some FAH values could not be encoded!\n")
+  stop("Fix FAH encoding before proceeding")
+}
+
+
+cat("\n COMPREHENSIVE FEATURE ENCODING \n")
+
+# Handle categorical variables more systematically
+categorical_vars <- sapply(data_processed, function(x) is.character(x) || is.factor(x))
+categorical_vars <- names(categorical_vars[categorical_vars])
+categorical_vars <- setdiff(categorical_vars, c("FAH", "FAH_encoded"))
+
+cat("Categorical variables to encode:", paste(categorical_vars, collapse = ", "), "\n")
+
+# One-hot encode categorical variables with frequency threshold
+for(var in categorical_vars) {
+  if(var %in% colnames(data_processed)) {
+    # Clean variable values to avoid formula issues
+    data_processed[[var]] <- make.names(data_processed[[var]])
+    
+    # Keep only categories that appear at least 50 times
+    freq_table <- table(data_processed[[var]])
+    keep_categories <- names(freq_table[freq_table >= 50])
+    
+    # Group rare categories into "Other"
+    data_processed[[var]] <- ifelse(data_processed[[var]] %in% keep_categories, 
+                                   data_processed[[var]], "Other")
+    
+    # Create dummy variables manually to avoid formula parsing issues
+    unique_vals <- unique(data_processed[[var]])
+    
+    for(val in unique_vals) {
+      new_col_name <- paste0(make.names(var), "_", make.names(val))
+      data_processed[[new_col_name]] <- as.numeric(data_processed[[var]] == val)
+    }
+    
+    # Remove original categorical variable
+    data_processed <- data_processed %>% select(-all_of(var))
+  }
+}
+
+```
+
+
+This chunk implements a comprehensive multi-method feature selection strategy to identify the most predictive variables for our neural network model. We begin by separating features from our target variable and standardizing all numeric features using centering and scaling to ensure variables with different units contribute equally to the selection process. 
+
+The approach combines three complementary feature selection methods: LASSO regularization to identify features with non-zero coefficients that contribute to linear prediction, Random Forest importance scoring to capture non-linear relationships and feature interactions, and correlation analysis to measure direct linear associations with the target variable. Each method contributes normalized scores (scaled 0-100) that are combined using weighted averaging (LASSO 30%, Random Forest 40%, Correlation 30%) to create composite feature importance scores. 
+
+Features that perform well across multiple methods receive additional weighting bonuses to favor robust predictors. The final selection chooses the top 25 features based on these composite scores, providing our neural network with a focused set of the most informative variables while reducing dimensionality and potential overfitting. This multi-method approach ensures we capture both linear and non-linear relationships while maintaining model interpretability and computational efficiency.
+
+
+```{r}
+
+# FEATURE SELECTION
+
+cat("\n=== FEATURE SELECTION ===\n")
+
+# Separate features and target
+target_col <- "FAH_encoded"
+exclude_cols <- c("FAH", "FAH_encoded")
+feature_cols <- setdiff(colnames(data_processed), exclude_cols)
+
+X <- data_processed[, feature_cols]
+y <- data_processed[[target_col]]
+
+# Standardize numerical features
+numeric_features <- sapply(X, is.numeric)
+if(sum(numeric_features) > 0) {
+  preprocess_params <- preProcess(X[, numeric_features], method = c("center", "scale"))
+  X[, numeric_features] <- predict(preprocess_params, X[, numeric_features])
+}
+
+# Enhanced multi-method feature selection with proper ranking
+X_matrix <- as.matrix(X)
+y_vector <- as.numeric(y)
+
+# Remove any remaining missing values
+complete_cases <- complete.cases(X_matrix, y_vector)
+X_matrix <- X_matrix[complete_cases, ]
+y_vector <- y_vector[complete_cases]
+
+cat("Complete cases for feature selection:", sum(complete_cases), "\n")
+
+# Create feature scoring framework
+all_features <- colnames(X_matrix)
+feature_scores <- data.frame(
+  Feature = all_features,
+  LASSO_Score = 0,
+  RF_Score = 0,
+  Correlation_Score = 0,
+  Total_Score = 0,
+  Method_Count = 0,
+  stringsAsFactors = FALSE
+)
+
+# 1. LASSO feature selection with scoring
+set.seed(42)
+cv_lasso <- cv.glmnet(X_matrix, y_vector, alpha = 1, nfolds = 10)
+lasso_coef <- coef(cv_lasso, s = "lambda.1se")
+lasso_coef_matrix <- as.matrix(lasso_coef)
+lasso_nonzero <- which(lasso_coef_matrix[,1] != 0 & rownames(lasso_coef_matrix) != "(Intercept)")
+
+if(length(lasso_nonzero) > 0) {
+  lasso_features <- rownames(lasso_coef_matrix)[lasso_nonzero]
+  lasso_coeffs <- abs(lasso_coef_matrix[lasso_nonzero, 1])
+  
+  # Normalize LASSO coefficients to 0-100 scale
+  if(max(lasso_coeffs) > 0) {
+    lasso_scores_norm <- (lasso_coeffs / max(lasso_coeffs)) * 100
+    
+    # Update feature scores
+    for(i in 1:length(lasso_features)) {
+      feat_idx <- which(feature_scores$Feature == lasso_features[i])
+      if(length(feat_idx) > 0) {
+        feature_scores$LASSO_Score[feat_idx] <- lasso_scores_norm[i]
+        feature_scores$Method_Count[feat_idx] <- feature_scores$Method_Count[feat_idx] + 1
+      }
+    }
+  }
+  cat("LASSO selected", length(lasso_features), "features\n")
+} else {
+  cat("LASSO selected no features\n")
+}
+
+# 2. Random Forest feature importance with scoring
+tryCatch({
+  set.seed(42)
+  rf_data <- X_matrix
+  rf_target <- y_vector
+  
+  # Limit features if too many for Random Forest
+  if(ncol(rf_data) > 50) {
+    cor_with_target <- abs(cor(rf_data, rf_target, use = "complete.obs"))
+    top_cor_features <- names(sort(cor_with_target[,1], decreasing = TRUE))[1:50]
+    rf_data <- rf_data[, top_cor_features, drop = FALSE]
+  }
+  
+  rf_model <- randomForest(x = rf_data, y = as.factor(rf_target), 
+                          importance = TRUE, ntree = 100, na.action = na.omit)
+  rf_importance <- importance(rf_model, type = 1)
+  
+  # Normalize RF importance to 0-100 scale
+  rf_scores_norm <- (rf_importance[,1] / max(rf_importance[,1])) * 100
+  
+  # Update feature scores for all features in RF model
+  for(i in 1:nrow(rf_importance)) {
+    feat_name <- rownames(rf_importance)[i]
+    feat_idx <- which(feature_scores$Feature == feat_name)
+    if(length(feat_idx) > 0) {
+      feature_scores$RF_Score[feat_idx] <- rf_scores_norm[i]
+      feature_scores$Method_Count[feat_idx] <- feature_scores$Method_Count[feat_idx] + 1
+    }
+  }
+  cat("Random Forest evaluated", nrow(rf_importance), "features\n")
+  
+}, error = function(e) {
+  cat("Warning: Random Forest feature selection failed:", e$message, "\n")
+  rf_importance <- NULL
+})
+
+# 3. Correlation-based feature selection with scoring
+cor_with_target <- abs(cor(X_matrix, y_vector, use = "complete.obs"))
+cor_scores_norm <- (cor_with_target[,1] / max(cor_with_target[,1])) * 100
+
+# Update correlation scores for all features
+for(i in 1:length(cor_scores_norm)) {
+  feat_name <- names(cor_scores_norm)[i]
+  feat_idx <- which(feature_scores$Feature == feat_name)
+  if(length(feat_idx) > 0) {
+    feature_scores$Correlation_Score[feat_idx] <- cor_scores_norm[i]
+    feature_scores$Method_Count[feat_idx] <- feature_scores$Method_Count[feat_idx] + 1
+  }
+}
+cat("Correlation analysis evaluated", length(cor_scores_norm), "features\n")
+
+# 4. Calculate composite scores with method weighting
+feature_scores$Total_Score <- (
+  feature_scores$LASSO_Score * 0.3 +           
+  feature_scores$RF_Score * 0.4 +              
+  feature_scores$Correlation_Score * 0.3       
+) * (1 + (feature_scores$Method_Count - 1) * 0.2)  
+
+# Sort by total score and select top features
+feature_scores <- feature_scores[order(feature_scores$Total_Score, decreasing = TRUE), ]
+
+# Select top 25 features based on composite scoring
+selected_features <- head(feature_scores$Feature, 25)
+
+cat("Selected", length(selected_features), "features using combined approach\n")
+cat("Features:", paste(head(selected_features, 25), collapse = ", "), "...\n")
+
+X_selected <- X_matrix[, selected_features, drop = FALSE]
+
+```
+This chunk implements a rigorous data splitting strategy that follows machine learning best practices to prevent data leakage and ensure robust model evaluation. The data is divided using a 70/15/15 split into training, validation, and test sets respectively, with stratified sampling to maintain proportional representation of each avalanche hazard level across all splits.
+
+The training set (70%) is used for model learning and parameter optimization, the validation set (15%) guides hyperparameter tuning and prevents overfitting during model selection, and the test set (15%) provides an unbiased final evaluation of model performance.
+
+The ROSE (Random Over-Sampling Examples) technique is applied exclusively to the training data after splitting to address the significant class imbalance identified in the EDA phase. Since ROSE only handles binary classification, the chunk implements an innovative one-versus-rest strategy that iteratively balances each minority class against all others, generating synthetic samples to achieve more balanced class distributions. The target is set to 95% of the majority class size to create substantial balance improvement while avoiding perfect balance that might introduce artificial patterns. This approach increases training data from the original imbalanced distribution to a more balanced dataset while preserving the natural class distributions in validation and test sets, ensuring that model evaluation reflects real-world performance. The imbalance ratio is reduced from the original severe imbalance to approximately 1.2:1, providing the neural network with sufficient examples of each avalanche hazard level to learn effective classification boundaries while maintaining evaluation integrity.
+
+```{r}
+
+# DATA SPLITTING (Before any sampling to prevent data leakage)
+
+cat("\n=== DATA SPLITTING (70/15/15) ===\n")
+
+# Prepare data for splitting (without any balancing yet)
+final_data <- as.data.frame(cbind(X_selected, y = y_vector))
+
+# Clean column names to avoid formula parsing issues
+colnames(final_data) <- make.names(colnames(final_data))
+
+# Split into train (70%), validation (15%), and test (15%)
+set.seed(42)
+train_indices <- createDataPartition(final_data$y, p = 0.7, list = FALSE)
+remaining_data <- final_data[-train_indices, ]
+
+# Split remaining 30% into validation (15%) and test (15%)
+val_test_indices <- createDataPartition(remaining_data$y, p = 0.5, list = FALSE)
+
+train_data <- final_data[train_indices, ]
+val_data <- remaining_data[val_test_indices, ]
+test_data <- remaining_data[-val_test_indices, ]
+
+cat("Original data size:", nrow(final_data), "\n")
+cat("Train set size:", nrow(train_data), "\n")
+cat("Validation set size:", nrow(val_data), "\n")
+cat("Test set size:", nrow(test_data), "\n")
+
+# Check class distribution before balancing
+cat("\nClass distribution in training set (before ROSE):\n")
+print(table(train_data$y))
+
+cat("\nClass distribution in validation set:\n")
+print(table(val_data$y))
+
+cat("\nClass distribution in test set:\n")
+print(table(test_data$y))
+
+# ROSE SAMPLING (Applied only to training data using one-vs-rest strategy)
+
+cat("\n=== ROSE SAMPLING ON TRAINING DATA ===\n")
+
+# Since ROSE only works with binary classification, we'll apply it iteratively
+# to balance each minority class against all others
+
+# Calculate class frequencies
+class_counts <- table(train_data$y)
+cat("Original class distribution:\n")
+print(class_counts)
+
+max_count <- max(class_counts)
+target_count <- round(max_count * 0.95)  # Target 80% of majority class size
+
+# Initialize with original training data
+balanced_train_data <- train_data
+
+set.seed(42)
+
+# Apply ROSE to each minority class
+for(class_val in names(class_counts)) {
+  current_count <- class_counts[class_val]
+  
+  if(current_count < target_count) {
+    cat(sprintf("Applying ROSE to class %s (%s): %d -> %d samples\n", 
+                class_val, fah_levels[as.numeric(class_val) + 1], current_count, target_count))
+    
+    # Create binary problem: current class vs all others
+    binary_data <- train_data
+    binary_data$binary_target <- ifelse(train_data$y == as.numeric(class_val), "target_class", "other_class")
+    binary_data$binary_target <- factor(binary_data$binary_target)
+    
+    # Remove original target variable
+    binary_data_for_rose <- binary_data[, !names(binary_data) %in% "y"]
+    
+    # Apply ROSE to create more samples of the minority class
+    rose_result <- ROSE(binary_target ~ ., data = binary_data_for_rose, 
+                       seed = 42 + as.numeric(class_val), p = 0.5)$data
+    
+    # Extract only the newly generated samples of the target class
+    new_samples <- rose_result[rose_result$binary_target == "target_class", ]
+    
+    # Remove the binary target column and add back the original target
+    new_samples$binary_target <- NULL
+    new_samples$y <- as.numeric(class_val)
+    
+    # Calculate how many new samples we need
+    n_new_samples <- target_count - current_count
+    
+    # Randomly select the required number of new samples
+    if(nrow(new_samples) > n_new_samples) {
+      sample_indices <- sample(nrow(new_samples), n_new_samples, replace = FALSE)
+      new_samples <- new_samples[sample_indices, ]
+    }
+    
+    # Add new samples to balanced dataset
+    balanced_train_data <- rbind(balanced_train_data, new_samples)
+    
+    cat(sprintf("Added %d new samples for class %s\n", nrow(new_samples), class_val))
+  }
+}
+
+# Remove any potential duplicates and shuffle
+balanced_train_data <- balanced_train_data[!duplicated(balanced_train_data), ]
+balanced_train_data <- balanced_train_data[sample(nrow(balanced_train_data)), ]
+
+cat("Training set size after ROSE:", nrow(balanced_train_data), "\n")
+cat("Class distribution after ROSE sampling:\n")
+print(table(balanced_train_data$y))
+
+# Calculate balancing improvement
+original_imbalance <- max(table(train_data$y)) / min(table(train_data$y))
+rose_imbalance <- max(table(balanced_train_data$y)) / min(table(balanced_train_data$y))
+cat(sprintf("Original imbalance ratio: %.2f:1\n", original_imbalance))
+cat(sprintf("ROSE imbalance ratio: %.2f:1\n", rose_imbalance))
+cat(sprintf("Imbalance reduction: %.1f%%\n", (1 - rose_imbalance/original_imbalance) * 100))
+
+```
+
+
+This chunk implements the neural network architecture. The model features a three-layer deep neural network with batch normalization, dropout regularization, and Gaussian noise injection to prevent overfitting and improve generalization. The architecture includes progressively smaller hidden layers (256→128→64 neurons in the best configuration) that allow the network to learn hierarchical representations of the avalanche risk patterns. Batch normalization stabilizes training by normalizing inputs to each layer, while dropout randomly deactivates neurons during training to reduce overfitting. The chunk implements systematic hyperparameter tuning by testing three carefully designed configurations that vary in network depth, regularization strength, and learning parameters. Each configuration is evaluated using early stopping and learning rate reduction callbacks to ensure optimal training convergence. The best performing configuration is selected based on validation accuracy, providing a robust foundation for the final model training phase.
+
+```{r}
+# NEURAL NETWORK ARCHITECTURE
+
+cat("\n=== NEURAL NETWORK ARCHITECTURE ===\n")
+
+# Prepare data for Keras
+X_train <- as.matrix(balanced_train_data[, -ncol(balanced_train_data)])
+y_train <- balanced_train_data$y  # Already 0-based (0,1,2,3,4)
+X_val <- as.matrix(val_data[, -ncol(val_data)])
+y_val <- val_data$y
+X_test <- as.matrix(test_data[, -ncol(test_data)])
+y_test <- test_data$y
+
+# Set correct number of classes
+num_classes <- length(fah_levels)  # Should be 5
+cat("Number of classes:", num_classes, "\n")
+cat("Class range in train:", min(y_train), "to", max(y_train), "\n")
+cat("Class range in val:", min(y_val), "to", max(y_val), "\n")
+cat("Class range in test:", min(y_test), "to", max(y_test), "\n")
+
+# Verify all classes are within expected range
+if(max(c(y_train, y_val, y_test)) >= num_classes) {
+  cat("ERROR: Class values exceed expected range!\n")
+  stop("Fix class encoding")
+}
+
+y_train_cat <- to_categorical(y_train, num_classes = num_classes)
+y_val_cat <- to_categorical(y_val, num_classes = num_classes)
+y_test_cat <- to_categorical(y_test, num_classes = num_classes)
+
+# Advanced model architecture with regularization
+create_advanced_model <- function(input_dim, num_classes, config) {
+  # Input layer with noise for regularization
+  input_layer <- layer_input(shape = input_dim)
+  
+  # Add gaussian noise for regularization
+  x <- input_layer %>% layer_gaussian_noise(stddev = 0.01)
+  
+  # First hidden layer
+  x <- x %>%
+    layer_dense(units = config$hidden_units_1, activation = 'relu') %>%
+    layer_batch_normalization() %>%
+    layer_dropout(rate = config$dropout_rate_1)
+  
+  # Second hidden layer
+  x <- x %>%
+    layer_dense(units = config$hidden_units_2, activation = 'relu') %>%
+    layer_batch_normalization() %>%
+    layer_dropout(rate = config$dropout_rate_2)
+  
+  # Third hidden layer (smaller)
+  x <- x %>%
+    layer_dense(units = config$hidden_units_3, activation = 'relu') %>%
+    layer_batch_normalization() %>%
+    layer_dropout(rate = config$dropout_rate_3)
+  
+  # Output layer
+  predictions <- x %>%
+    layer_dense(units = num_classes, activation = 'softmax')
+  
+  model <- keras_model(inputs = input_layer, outputs = predictions)
+  
+  # Compile with advanced optimizer
+  model %>% compile(
+    optimizer = optimizer_adam(
+      learning_rate = config$learning_rate,
+      beta_1 = 0.9,
+      beta_2 = 0.999,
+      epsilon = 1e-07
+    ),
+    loss = 'categorical_crossentropy',
+    metrics = c('accuracy', 'categorical_crossentropy')
+  )
+  
+  return(model)
+}
+
+# Enhanced hyperparameter tuning
+best_configs <- list(
+  list(hidden_units_1 = 256, hidden_units_2 = 128, hidden_units_3 = 64,
+       dropout_rate_1 = 0.3, dropout_rate_2 = 0.4, dropout_rate_3 = 0.5,
+       learning_rate = 0.001, batch_size = 64),
+  list(hidden_units_1 = 512, hidden_units_2 = 256, hidden_units_3 = 128,
+       dropout_rate_1 = 0.2, dropout_rate_2 = 0.3, dropout_rate_3 = 0.4,
+       learning_rate = 0.0005, batch_size = 32),
+  list(hidden_units_1 = 384, hidden_units_2 = 192, hidden_units_3 = 96,
+       dropout_rate_1 = 0.25, dropout_rate_2 = 0.35, dropout_rate_3 = 0.45,
+       learning_rate = 0.0008, batch_size = 48)
+)
+
+best_score <- 0
+best_config <- NULL
+
+for(i in 1:length(best_configs)) {
+  config <- best_configs[[i]]
+  cat(sprintf("Testing configuration %d/%d\n", i, length(best_configs)))
+  
+  set.seed(42)
+  model <- create_advanced_model(ncol(X_train), num_classes, config)
+  
+  # Train with callbacks
+  history <- model %>% fit(
+    X_train, y_train_cat,
+    epochs = 100,
+    batch_size = config$batch_size,
+    validation_data = list(X_val, y_val_cat),
+    verbose = 0,
+    callbacks = list(
+      callback_early_stopping(patience = 15, restore_best_weights = TRUE),
+      callback_reduce_lr_on_plateau(patience = 8, factor = 0.5, min_lr = 1e-6)
+    )
+  )
+  
+  val_score <- max(history$metrics$val_accuracy)
+  cat(sprintf("Validation accuracy: %.4f\n", val_score))
+  
+  if(val_score > best_score) {
+    best_score <- val_score
+    best_config <- config
+  }
+}
+
+cat("\nBest configuration found:\n")
+print(best_config)
+cat("Best validation accuracy:", best_score, "\n")
+
+
+```
+
+This chunk trains the final neural network model using the optimal hyperparameters identified in the previous tuning phase. The training process employs optimization strategies including extended training epochs (150) with patience-based early stopping to prevent overfitting while allowing sufficient time for convergence. The implementation uses advanced callbacks including learning rate reduction on plateau, which automatically decreases the learning rate when validation performance stagnates, enabling fine-tuned optimization in later training stages. Since the training data was already balanced using ROSE sampling, no additional class weighting is required, allowing the model to learn from the artificially balanced dataset. The training process monitors both training and validation metrics to track model performance and detect potential overfitting, with the best model weights automatically restored if performance degrades. This comprehensive training approach ensures the model achieves optimal performance on the avalanche hazard prediction task.
+
+```{r}
+# FINAL MODEL TRAINING
+
+cat("\n=== FINAL MODEL TRAINING ===\n")
+
+# Train final model with best configuration
+set.seed(42)
+final_model <- create_advanced_model(ncol(X_train), num_classes, best_config)
+
+# Train final model (no class weights needed since we used ROSE)
+final_history <- final_model %>% fit(
+  X_train, y_train_cat,
+  epochs = 150,
+  batch_size = best_config$batch_size,
+  validation_data = list(X_val, y_val_cat),
+  callbacks = list(
+    callback_early_stopping(patience = 30, restore_best_weights = TRUE),
+    callback_reduce_lr_on_plateau(patience = 15, factor = 0.3, min_lr = 1e-7)
+  )
+)
+
+```
+
+This chunk conducts an extensive evaluation of the trained neural network model using multiple metrics appropriate for multiclass classification problems. The evaluation begins with standard test set performance metrics including accuracy and loss, then expands to detailed prediction analysis including confidence distribution assessment. 
+
+The chunk calculates prediction confidence levels to understand when the model is most and least certain about its predictions, which is crucial for operational avalanche forecasting where confidence levels inform decision-making. A comprehensive confusion matrix analysis reveals specific patterns in model errors, identifying which avalanche hazard levels are most commonly confused with each other. 
+
+The evaluation includes per-class metrics (precision, recall, F1-score) to understand model performance across all five avalanche risk levels, macro and weighted averages to account for class imbalance effects, and Cohen's Kappa to measure agreement beyond chance. Advanced visualizations display training history, feature importance rankings, prediction confidence distributions, and class distribution comparisons to provide comprehensive insights into model behavior and performance characteristics.
+
+This final chunk also implements a comprehensive evaluation framework specifically designed for ordinal classification problems in avalanche risk prediction. Unlike standard multiclass classification, avalanche hazard levels have a natural ordering from Low to High, making ordinal-specific metrics essential for proper model assessment. The evaluation calculates Mean Absolute Error (MAE) and Root Mean Squared Error (RMSE) treating predictions as ordinal values, adjacent accuracy metrics that measure predictions within one risk level of the true value (crucial for operational safety), and distance-weighted accuracy measures that penalize larger prediction errors more severely. The chunk implements avalanche-specific safety metrics including critical miss rate (predicting low risk when actual risk is high), conservative bias assessment, and safety margin effectiveness. Advanced correlation measures like Kendall's Tau and Spearman's rank correlation evaluate the model's ability to maintain proper risk ordering. The evaluation concludes with comprehensive risk assessment metrics including high-risk detection sensitivity, confidence analysis by risk level, and directional accuracy measures. This specialized evaluation approach ensures the model is assessed not just for classification accuracy, but for its practical utility and safety implications in real-world avalanche forecasting scenarios.
+
+```{r}
+
+# EVALUATION METRICS
+
+cat("\n=== COMPREHENSIVE EVALUATION ===\n")
+
+# Test set evaluation
+test_scores <- final_model %>% evaluate(X_test, y_test_cat, verbose = 0)
+cat("Test accuracy:", test_scores$accuracy, "\n")
+cat("Test loss:", test_scores$loss, "\n")
+
+# Detailed predictions and analysis
+predictions <- final_model %>% predict(X_test, verbose = 0)
+predicted_classes <- apply(predictions, 1, which.max) - 1  # Convert back to 0-based
+predicted_probs <- apply(predictions, 1, max)
+
+# Confidence analysis
+high_confidence <- predicted_probs > 0.8
+medium_confidence <- predicted_probs > 0.6 & predicted_probs <= 0.8
+low_confidence <- predicted_probs <= 0.6
+
+cat("\nPrediction confidence distribution:\n")
+cat("High confidence (>0.8):", sum(high_confidence), "predictions\n")
+cat("Medium confidence (0.6-0.8):", sum(medium_confidence), "predictions\n") 
+cat("Low confidence (<=0.6):", sum(low_confidence), "predictions\n")
+
+# Accuracy by confidence level
+if(sum(high_confidence) > 0) {
+  cat("\nAccuracy by confidence level:\n")
+  cat("High confidence accuracy:", mean(predicted_classes[high_confidence] == y_test[high_confidence]), "\n")
+}
+if(sum(medium_confidence) > 0) {
+  cat("Medium confidence accuracy:", mean(predicted_classes[medium_confidence] == y_test[medium_confidence]), "\n")
+}
+if(sum(low_confidence) > 0) {
+  cat("Low confidence accuracy:", mean(predicted_classes[low_confidence] == y_test[low_confidence]), "\n")
+}
+
+# Confusion matrix with proper class labels
+confusion_matrix <- table(Predicted = predicted_classes, Actual = y_test)
+cat("\nConfusion Matrix:\n")
+print(confusion_matrix)
+
+# Classification report
+cm <- confusionMatrix(as.factor(predicted_classes), as.factor(y_test))
+print(cm)
+
+# VISUALIZATION AND FINAL INSIGHTS
+
+cat("\n=== CREATING VISUALIZATIONS ===\n")
+
+# Set up plotting
+par(mfrow = c(2, 3), mar = c(4, 4, 3, 1))
+
+# Training history
+if(length(final_history$metrics$accuracy) > 0) {
+  plot(final_history$metrics$accuracy, type = 'l', col = 'blue', 
+       main = 'Model Accuracy', ylab = 'Accuracy', xlab = 'Epoch')
+  if(length(final_history$metrics$val_accuracy) > 0) {
+    lines(final_history$metrics$val_accuracy, col = 'red')
+    legend('bottomright', c('Training', 'Validation'), col = c('blue', 'red'), lty = 1)
+  }
+}
+
+if(length(final_history$metrics$loss) > 0) {
+  plot(final_history$metrics$loss, type = 'l', col = 'blue', 
+       main = 'Model Loss', ylab = 'Loss', xlab = 'Epoch')
+  if(length(final_history$metrics$val_loss) > 0) {
+    lines(final_history$metrics$val_loss, col = 'red')
+    legend('topright', c('Training', 'Validation'), col = c('blue', 'red'), lty = 1)
+  }
+}
+
+# Feature importance (if Random Forest was successful)
+if(exists("rf_importance") && !is.null(rf_importance)) {
+  top_features <- head(selected_features, 10)
+  if(length(top_features) > 0 && all(top_features %in% rownames(rf_importance))) {
+    barplot(rf_importance[top_features, 1], 
+            names.arg = substr(top_features, 1, 10),
+            las = 2, main = "Top 10 Feature Importance",
+            ylab = "Importance", cex.names = 0.7, col = "steelblue")
+  }
+}
+
+# Prediction confidence histogram
+hist(predicted_probs, main = "Prediction Confidence Distribution", 
+     xlab = "Confidence", ylab = "Frequency", col = "lightblue", breaks = 20)
+
+# Class distribution comparison
+barplot(table(balanced_train_data$y), main = "ROSE Balanced Training Data", 
+        names.arg = fah_levels, ylab = "Count", col = "lightgreen", las = 2)
+barplot(table(y_test), main = "Test Data Distribution", 
+        names.arg = fah_levels, ylab = "Count", col = "lightcoral", las = 2)
+
+# Reset plotting parameters
+par(mfrow = c(1, 1))
+
+# FINAL INSIGHTS AND RECOMMENDATIONS
+
+cat("\n=== FINAL INSIGHTS AND RECOMMENDATIONS ===\n")
+cat("Original dataset size:", nrow(final_data), "\n")
+cat("Training set size after ROSE:", nrow(balanced_train_data), "\n")
+cat("Number of features selected:", length(selected_features), "\n")
+cat("Best validation accuracy:", sprintf("%.4f", best_score), "\n")
+cat("Final test accuracy:", sprintf("%.4f", test_scores$accuracy), "\n")
+cat("Number of classes:", num_classes, "\n")
+
+# Performance by class analysis
+cat("\n=== PERFORMANCE BY AVALANCHE RISK CLASS ===\n")
+for(i in 0:(num_classes-1)) {
+  class_mask <- y_test == i
+  if(sum(class_mask) > 0) {
+    class_accuracy <- mean(predicted_classes[class_mask] == y_test[class_mask])
+    class_count <- sum(class_mask)
+    avg_confidence <- mean(predicted_probs[class_mask])
+    cat(sprintf("%-15s: Accuracy=%.3f, Count=%3d, Avg Confidence=%.3f\n", 
+                fah_levels[i+1], class_accuracy, class_count, avg_confidence))
+  }
+}
+
+# Error analysis
+misclassified <- predicted_classes != y_test
+if(sum(misclassified) > 0) {
+  cat("\n=== ERROR ANALYSIS ===\n")
+  cat("Total misclassified predictions:", sum(misclassified), "\n")
+  
+  # Low confidence errors
+  low_conf_errors <- misclassified & low_confidence
+  cat("Low confidence errors:", sum(low_conf_errors), "out of", sum(misclassified), "total errors\n")
+  
+  # Most problematic class pairs
+  error_df <- data.frame(
+    Actual = fah_levels[y_test[misclassified] + 1],
+    Predicted = fah_levels[predicted_classes[misclassified] + 1]
+  )
+  cat("\nMost common misclassification patterns:\n")
+  error_patterns <- table(error_df$Actual, error_df$Predicted)
+  print(error_patterns)
+}
+
+# Performance comparison with baseline
+baseline_accuracy <- max(table(y_test)) / length(y_test)
+improvement <- (test_scores$accuracy - baseline_accuracy) / baseline_accuracy * 100
+
+cat("\n=== PERFORMANCE COMPARISON ===\n")
+cat("Baseline accuracy (most frequent class):", sprintf("%.1f%%", baseline_accuracy * 100), "\n")
+cat("Neural network accuracy:", sprintf("%.1f%%", test_scores$accuracy * 100), "\n")
+cat("Relative improvement:", sprintf("%.1f%%", improvement), "\n")
+
+# Feature importance summary
+if(exists("feature_scores")) {
+  cat("\n=== TOP 10 MOST IMPORTANT FEATURES ===\n")
+  top_10_summary <- head(feature_scores, 10)
+  for(i in 1:nrow(top_10_summary)) {
+    cat(sprintf("%2d. %-25s (Total Score: %.1f)\n", 
+                i, top_10_summary$Feature[i], top_10_summary$Total_Score[i]))
+  }
+}
+
+# Model architecture summary
+cat("\n=== FINAL MODEL ARCHITECTURE SUMMARY ===\n")
+if(exists("best_config")) {
+  cat("Architecture: Input ->", best_config$hidden_units_1, "->", 
+      best_config$hidden_units_2, "->", best_config$hidden_units_3, "-> Output (", num_classes, "classes)\n")
+  cat("Regularization: Batch Normalization + Dropout (", 
+      best_config$dropout_rate_1, ",", best_config$dropout_rate_2, ",", 
+      best_config$dropout_rate_3, ") + Gaussian Noise\n")
+  cat("Optimizer: Adam with learning rate", best_config$learning_rate, "\n")
+  cat("Batch size:", best_config$batch_size, "\n")
+}
+
+cat("Total parameters: ~", format(final_model$count_params(), big.mark = ","), "\n")
+cat("Training epochs:", length(final_history$metrics$accuracy), "\n")
+
+# Enhanced TEST SET EVALUATION METRICS
+
+cat("\n=== ENHANCED TEST SET EVALUATION METRICS ===\n")
+
+# Calculate comprehensive metrics for multiclass classification
+calculate_multiclass_metrics <- function(y_true, y_pred, class_names) {
+  # Convert to factors for caret
+  y_true_factor <- factor(y_true, levels = 0:(length(class_names)-1), labels = class_names)
+  y_pred_factor <- factor(y_pred, levels = 0:(length(class_names)-1), labels = class_names)
+  
+  # Overall metrics
+  accuracy <- mean(y_true == y_pred)
+  
+  # Per-class metrics
+  precision_per_class <- c()
+  recall_per_class <- c()
+  f1_per_class <- c()
+  
+  for(i in 0:(length(class_names)-1)) {
+    # True positives, false positives, false negatives
+    tp <- sum(y_true == i & y_pred == i)
+    fp <- sum(y_true != i & y_pred == i)
+    fn <- sum(y_true == i & y_pred != i)
+    
+    # Calculate metrics
+    precision <- ifelse(tp + fp == 0, 0, tp / (tp + fp))
+    recall <- ifelse(tp + fn == 0, 0, tp / (tp + fn))
+    f1 <- ifelse(precision + recall == 0, 0, 2 * precision * recall / (precision + recall))
+    
+    precision_per_class <- c(precision_per_class, precision)
+    recall_per_class <- c(recall_per_class, recall)
+    f1_per_class <- c(f1_per_class, f1)
+  }
+  
+  # Macro averages
+  macro_precision <- mean(precision_per_class)
+  macro_recall <- mean(recall_per_class)
+  macro_f1 <- mean(f1_per_class)
+  
+  # Weighted averages (weighted by support)
+  class_support <- table(y_true)
+  weights <- as.numeric(class_support) / sum(class_support)
+  
+  weighted_precision <- sum(precision_per_class * weights)
+  weighted_recall <- sum(recall_per_class * weights)
+  weighted_f1 <- sum(f1_per_class * weights)
+  
+  return(list(
+    accuracy = accuracy,
+    macro_precision = macro_precision,
+    macro_recall = macro_recall,
+    macro_f1 = macro_f1,
+    weighted_precision = weighted_precision,
+    weighted_recall = weighted_recall,
+    weighted_f1 = weighted_f1,
+    per_class_precision = precision_per_class,
+    per_class_recall = recall_per_class,
+    per_class_f1 = f1_per_class,
+    class_names = class_names
+  ))
+}
+
+# Calculate detailed metrics
+detailed_metrics <- calculate_multiclass_metrics(y_test, predicted_classes, fah_levels)
+
+# Display overall metrics
+cat("\n=== OVERALL TEST SET METRICS ===\n")
+cat(sprintf("Accuracy:           %.4f\n", detailed_metrics$accuracy))
+cat(sprintf("Macro Precision:    %.4f\n", detailed_metrics$macro_precision))
+cat(sprintf("Macro Recall:       %.4f\n", detailed_metrics$macro_recall))
+cat(sprintf("Macro F1-Score:     %.4f\n", detailed_metrics$macro_f1))
+cat(sprintf("Weighted Precision: %.4f\n", detailed_metrics$weighted_precision))
+cat(sprintf("Weighted Recall:    %.4f\n", detailed_metrics$weighted_recall))
+cat(sprintf("Weighted F1-Score:  %.4f\n", detailed_metrics$weighted_f1))
+
+# Display per-class metrics
+cat("\n=== PER-CLASS METRICS ===\n")
+cat(sprintf("%-15s %9s %9s %9s %9s\n", "Class", "Precision", "Recall", "F1-Score", "Support"))
+cat(paste(rep("-", 60), collapse = ""), "\n")
+
+class_support <- table(y_test)
+for(i in 1:length(fah_levels)) {
+  class_name <- fah_levels[i]
+  precision <- detailed_metrics$per_class_precision[i]
+  recall <- detailed_metrics$per_class_recall[i]
+  f1 <- detailed_metrics$per_class_f1[i]
+  support <- class_support[as.character(i-1)]
+  
+  cat(sprintf("%-15s %9.4f %9.4f %9.4f %9d\n", 
+              class_name, precision, recall, f1, support))
+}
+
+# Additional advanced metrics
+cat("\n=== ADDITIONAL METRICS ===\n")
+
+# Cohen's Kappa (agreement accounting for chance)
+tryCatch({
+  kappa_result <- kappa2(data.frame(y_test, predicted_classes))
+  kappa_score <- kappa_result$value
+  cat(sprintf("Cohen's Kappa:      %.4f\n", kappa_score))
+}, error = function(e) {
+  # Manual Cohen's Kappa calculation if irr package fails
+  observed_agreement <- mean(y_test == predicted_classes)
+  
+  # Calculate expected agreement by chance
+  marginal_actual <- table(y_test) / length(y_test)
+  marginal_predicted <- table(predicted_classes) / length(predicted_classes)
+  
+  expected_agreement <- 0
+  for(i in 0:(length(fah_levels)-1)) {
+    if(as.character(i) %in% names(marginal_actual) && as.character(i) %in% names(marginal_predicted)) {
+      expected_agreement <- expected_agreement + marginal_actual[as.character(i)] * marginal_predicted[as.character(i)]
+    }
+  }
+  
+  kappa_score <- (observed_agreement - expected_agreement) / (1 - expected_agreement)
+  cat(sprintf("Cohen's Kappa:      %.4f (manual calculation)\n", kappa_score))
+})
+
+# Mean Absolute Error for ordinal nature
+mae_score <- mean(abs(y_test - predicted_classes))
+cat(sprintf("Mean Absolute Error (ordinal): %.4f\n", mae_score))
+
+# Classification error by distance
+error_distances <- abs(y_test - predicted_classes)[y_test != predicted_classes]
+if(length(error_distances) > 0) {
+  cat("\n=== ERROR DISTANCE ANALYSIS ===\n")
+  cat("Distribution of prediction errors by distance:\n")
+  error_dist_table <- table(error_distances)
+  for(dist in names(error_dist_table)) {
+    cat(sprintf("Distance %s: %d errors (%.1f%% of total errors)\n", 
+                dist, error_dist_table[dist], 
+                error_dist_table[dist]/length(error_distances)*100))
+  }
+}
+
+# ORDINAL EVALUATION METRICS
+
+cat("\n=== COMPREHENSIVE ORDINAL EVALUATION METRICS ===\n")
+
+# Load required library for ordinal metrics
+if(!require("Metrics", quietly = TRUE)) {
+  install.packages("Metrics")
+  library(Metrics)
+}
+
+# 1. Mean Absolute Error (MAE) - already calculated above but expanding
+cat(sprintf("Mean Absolute Error (MAE):        %.4f\n", mae_score))
+
+# 2. Root Mean Squared Error (RMSE) for ordinal data
+rmse_score <- sqrt(mean((y_test - predicted_classes)^2))
+cat(sprintf("Root Mean Squared Error (RMSE):   %.4f\n", rmse_score))
+
+# 3. Mean Squared Error (MSE)
+mse_score <- mean((y_test - predicted_classes)^2)
+cat(sprintf("Mean Squared Error (MSE):         %.4f\n", mse_score))
+
+# 4. Ordinal classification accuracy (exact match)
+ordinal_accuracy <- mean(y_test == predicted_classes)
+cat(sprintf("Ordinal Accuracy (exact match):   %.4f\n", ordinal_accuracy))
+
+# 5. Adjacent accuracy (off by at most 1 level)
+adjacent_accuracy <- mean(abs(y_test - predicted_classes) <= 1)
+cat(sprintf("Adjacent Accuracy (≤1 level off): %.4f\n", adjacent_accuracy))
+
+# 6. Within-2 accuracy (off by at most 2 levels)
+within2_accuracy <- mean(abs(y_test - predicted_classes) <= 2)
+cat(sprintf("Within-2 Accuracy (≤2 levels off): %.4f\n", within2_accuracy))
+
+# 7. Ordinal loss (penalizes larger deviations more)
+ordinal_loss <- sum(abs(y_test - predicted_classes)^2) / length(y_test)
+cat(sprintf("Ordinal Loss (squared deviations): %.4f\n", ordinal_loss))
+
+# 8. Weighted accuracy by distance
+distance_weights <- 1 / (1 + abs(y_test - predicted_classes))
+weighted_accuracy <- mean(distance_weights)
+cat(sprintf("Distance-Weighted Accuracy:       %.4f\n", weighted_accuracy))
+
+# 9. Kendall's Tau (rank correlation)
+if(require("Kendall", quietly = TRUE)) {
+  tryCatch({
+    kendall_result <- Kendall(y_test, predicted_classes)
+    kendall_tau <- kendall_result$tau
+    kendall_p <- kendall_result$sl[1]
+    cat(sprintf("Kendall's Tau (rank correlation): %.4f (p-value: %.4f)\n", kendall_tau, kendall_p))
+  }, error = function(e) {
+    cat("Kendall's Tau calculation failed\n")
+  })
+} else {
+  # Manual calculation of Kendall's Tau
+  n <- length(y_test)
+  concordant <- 0
+  discordant <- 0
+  
+  for(i in 1:(n-1)) {
+    for(j in (i+1):n) {
+      if((y_test[i] - y_test[j]) * (predicted_classes[i] - predicted_classes[j]) > 0) {
+        concordant <- concordant + 1
+      } else if((y_test[i] - y_test[j]) * (predicted_classes[i] - predicted_classes[j]) < 0) {
+        discordant <- discordant + 1
+      }
+    }
+  }
+  
+  kendall_tau_manual <- (concordant - discordant) / (n * (n - 1) / 2)
+  cat(sprintf("Kendall's Tau (manual calc):      %.4f\n", kendall_tau_manual))
+}
+
+# 10. Spearman's rank correlation
+spearman_corr <- cor(y_test, predicted_classes, method = "spearman")
+cat(sprintf("Spearman's Rank Correlation:      %.4f\n", spearman_corr))
+
+# 11. Pearson correlation (treating as continuous)
+pearson_corr <- cor(y_test, predicted_classes, method = "pearson")
+cat(sprintf("Pearson Correlation:              %.4f\n", pearson_corr))
+
+# 12. Cumulative accuracy metrics
+cumulative_accuracies <- c()
+for(tolerance in 0:4) {
+  cum_acc <- mean(abs(y_test - predicted_classes) <= tolerance)
+  cumulative_accuracies <- c(cumulative_accuracies, cum_acc)
+  cat(sprintf("Cumulative Accuracy (≤%d levels): %.4f\n", tolerance, cum_acc))
+}
+
+# 13. Ordinal-specific confusion matrix analysis
+cat("\n=== ORDINAL CONFUSION MATRIX ANALYSIS ===\n")
+
+# Distance-based confusion analysis
+distance_matrix <- outer(0:4, 0:4, function(x, y) abs(x - y))
+rownames(distance_matrix) <- fah_levels
+colnames(distance_matrix) <- fah_levels
+
+cat("Distance matrix between classes:\n")
+print(distance_matrix)
+
+# Weighted confusion matrix (penalizing by distance)
+weighted_confusion <- confusion_matrix * distance_matrix[1:nrow(confusion_matrix), 1:ncol(confusion_matrix)]
+cat("\nWeighted confusion matrix (errors penalized by distance):\n")
+print(weighted_confusion)
+
+# Total weighted error
+total_weighted_error <- sum(weighted_confusion)
+cat(sprintf("Total Weighted Error Score: %.2f\n", total_weighted_error))
+
+# 14. Severity-weighted metrics (higher penalties for severe misclassifications)
+severity_weights <- c(1, 2, 4, 8, 16)  # Exponential penalty for higher risk misses
+severity_penalty <- 0
+
+for(i in 1:length(y_test)) {
+  actual_severity <- severity_weights[y_test[i] + 1]
+  predicted_severity <- severity_weights[predicted_classes[i] + 1]
+  
+  # Penalty for underestimating risk (more dangerous)
+  if(predicted_classes[i] < y_test[i]) {
+    severity_penalty <- severity_penalty + (actual_severity - predicted_severity) * 2
+  } 
+  # Penalty for overestimating risk (less dangerous but still costly)
+  else if(predicted_classes[i] > y_test[i]) {
+    severity_penalty <- severity_penalty + (predicted_severity - actual_severity) * 1
+  }
+}
+
+avg_severity_penalty <- severity_penalty / length(y_test)
+cat(sprintf("Average Severity Penalty:         %.4f\n", avg_severity_penalty))
+
+# 15. Directional accuracy (proportion of correct trends)
+# For ordinal data, we can assess if the model correctly identifies the direction of risk
+correct_direction <- 0
+total_comparisons <- 0
+
+for(i in 1:(length(y_test)-1)) {
+  for(j in (i+1):length(y_test)) {
+    actual_diff <- y_test[i] - y_test[j]
+    predicted_diff <- predicted_classes[i] - predicted_classes[j]
+    
+    if(actual_diff != 0) {  # Only consider cases where there's an actual difference
+      if(sign(actual_diff) == sign(predicted_diff)) {
+        correct_direction <- correct_direction + 1
+      }
+      total_comparisons <- total_comparisons + 1
+    }
+  }
+}
+
+directional_accuracy <- ifelse(total_comparisons > 0, correct_direction / total_comparisons, 0)
+cat(sprintf("Directional Accuracy:             %.4f\n", directional_accuracy))
+
+# 16. Proportional reduction in error (compared to baseline ordinal prediction)
+baseline_mae <- mean(abs(y_test - median(y_test)))
+proportional_reduction <- (baseline_mae - mae_score) / baseline_mae
+cat(sprintf("Proportional Reduction in MAE:    %.4f\n", proportional_reduction))
+
+# 17. Ordinal classification summary table
+cat("\n=== ORDINAL CLASSIFICATION SUMMARY TABLE ===\n")
+ordinal_summary <- data.frame(
+  Metric = c("Exact Accuracy", "Adjacent Accuracy (±1)", "Within-2 Accuracy (±2)", 
+             "MAE", "RMSE", "Kendall's Tau", "Spearman's ρ", "Directional Accuracy"),
+  Value = c(ordinal_accuracy, adjacent_accuracy, within2_accuracy, 
+            mae_score, rmse_score, 
+            ifelse(exists("kendall_tau"), kendall_tau, 
+                   ifelse(exists("kendall_tau_manual"), kendall_tau_manual, NA)),
+            spearman_corr, directional_accuracy),
+  Interpretation = c("Perfect predictions", "Off by ≤1 level", "Off by ≤2 levels",
+                    "Avg distance from true", "Penalizes large errors", 
+                    "Rank correlation", "Rank correlation", "Correct ordering"),
+  stringsAsFactors = FALSE
+)
+
+print(kable(ordinal_summary, digits = 4, 
+           caption = "Comprehensive Ordinal Classification Metrics") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+
+# 18. Risk assessment specific metrics for avalanche prediction
+cat("\n=== AVALANCHE-SPECIFIC RISK ASSESSMENT METRICS ===\n")
+
+# Critical miss rate (predicting lower risk when actual is high)
+high_risk_actual <- y_test >= 3  # Considerable+ and High
+low_predicted_for_high_actual <- (y_test >= 3) & (predicted_classes <= 1)  # Predicted Low/Moderate
+critical_miss_rate <- sum(low_predicted_for_high_actual) / sum(high_risk_actual)
+
+cat(sprintf("Critical Miss Rate (Low pred/High actual): %.4f\n", critical_miss_rate))
+
+# Conservative bias (tendency to over-predict risk)
+conservative_predictions <- sum(predicted_classes > y_test)
+liberal_predictions <- sum(predicted_classes < y_test)
+conservative_bias <- (conservative_predictions - liberal_predictions) / length(y_test)
+
+cat(sprintf("Conservative Bias (>0 = over-predict):    %.4f\n", conservative_bias))
+
+# Safety margin effectiveness
+safe_predictions <- sum(predicted_classes >= y_test)  # At or above actual risk
+safety_effectiveness <- safe_predictions / length(y_test)
+
+cat(sprintf("Safety Effectiveness (≥actual risk):     %.4f\n", safety_effectiveness))
+
+# High-risk detection sensitivity and specificity
+high_risk_threshold <- 2  # Considerable- and above
+true_high_risk <- y_test >= high_risk_threshold
+predicted_high_risk <- predicted_classes >= high_risk_threshold
+
+high_risk_sensitivity <- sum(true_high_risk & predicted_high_risk) / sum(true_high_risk)
+high_risk_specificity <- sum(!true_high_risk & !predicted_high_risk) / sum(!true_high_risk)
+
+cat(sprintf("High-Risk Sensitivity (detect high):     %.4f\n", high_risk_sensitivity))
+cat(sprintf("High-Risk Specificity (avoid false+):    %.4f\n", high_risk_specificity))
+
+# Model confidence analysis for different risk levels
+cat("\n=== CONFIDENCE ANALYSIS BY RISK LEVEL ===\n")
+for(risk_level in 0:4) {
+  if(sum(y_test == risk_level) > 0) {
+    level_mask <- y_test == risk_level
+    avg_confidence <- mean(predicted_probs[level_mask])
+    correct_predictions <- sum(predicted_classes[level_mask] == y_test[level_mask])
+    total_predictions <- sum(level_mask)
+    accuracy_at_level <- correct_predictions / total_predictions
+    
+    cat(sprintf("%-15s: Avg Confidence=%.3f, Accuracy=%.3f, Count=%d\n", 
+                fah_levels[risk_level + 1], avg_confidence, accuracy_at_level, total_predictions))
+  }
+}
+
+# Final ordinal performance summary
+cat("\n=== FINAL ORDINAL PERFORMANCE SUMMARY ===\n")
+cat("==========================================\n")
+cat(sprintf("Model Performance on Ordinal Avalanche Risk Prediction:\n"))
+cat(sprintf("- Exact Match Accuracy:     %.1f%%\n", ordinal_accuracy * 100))
+cat(sprintf("- Adjacent Accuracy (±1):   %.1f%%\n", adjacent_accuracy * 100))
+cat(sprintf("- Safety Effectiveness:     %.1f%%\n", safety_effectiveness * 100))
+cat(sprintf("- Critical Miss Rate:       %.1f%%\n", critical_miss_rate * 100))
+cat(sprintf("- Mean Absolute Error:      %.2f levels\n", mae_score))
+cat(sprintf("- Rank Correlation:         %.3f\n", spearman_corr))
+cat(sprintf("- Conservative Bias:        %.3f\n", conservative_bias))
+
+if(critical_miss_rate < 0.05) {
+  cat("✓ Excellent safety performance (critical miss rate < 5%)\n")
+} else if(critical_miss_rate < 0.10) {
+  cat("⚠ Good safety performance (critical miss rate < 10%)\n")
+} else {
+  cat("⚠ Concerning safety performance (critical miss rate ≥ 10%)\n")
+}
+
+if(adjacent_accuracy > 0.90) {
+  cat("✓ Excellent ordinal accuracy (>90% within ±1 level)\n")
+} else if(adjacent_accuracy > 0.80) {
+  cat("✓ Good ordinal accuracy (>80% within ±1 level)\n")
+} else {
+  cat("⚠ Moderate ordinal accuracy (<80% within ±1 level)\n")
+}
+
+cat("==========================================\n")
+
+# Clean up
+rm(list = ls()[grepl("temp|tmp", ls())])
+gc()
+
+cat("\n=== MODEL TRAINING AND EVALUATION COMPLETE ===\n")
+
+```
+
