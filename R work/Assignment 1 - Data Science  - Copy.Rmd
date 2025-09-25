@@ -6,7 +6,6 @@ This R Markdown file covers the Model for Assignment 1. The code should be read
 in conjunction with the corresponding Report. The Model aims to predict FAH.
 
 The section below loads the data.
-
 ```{r}
 
 # Scottish Avalanche Hazard Prediction using Enhanced Neural Networks
