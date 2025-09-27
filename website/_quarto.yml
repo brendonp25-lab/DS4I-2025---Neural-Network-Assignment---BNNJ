@@ -1,0 +1,15 @@
+project:
+  type: website
+  output-dir: ../docs  # Outputs to docs in the parent (repo root) folder
+website:
+  title: "DS4I-2025 Neural Network Assignment"
+  navbar:
+    left:
+      - href: index.html
+        text: Home
+      - href: paper.html
+        text: Scientific Paper
+      - href: llm-reflection.html
+        text: LLM Reflection
+
+

@@ -1,0 +1,8 @@
+---
+title: "STA5073Z Assignment 1: Avalanche Hazard Prediction "
+embed-resources: true
+---
+Welcome to our Avalanche Hazard Prediction project.  
+- [Scientific Paper](paper.html)  
+- [LLM Reflection](llm-reflection.html)  
+

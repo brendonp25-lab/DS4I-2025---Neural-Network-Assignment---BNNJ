@@ -1,0 +1,14 @@
+---
+title: "Scientific Paper: Neural Network for Forecasted Avalanche Hazard"
+author:
+  - name: Brnedon Pretorius
+  - name: Johan John
+  - name: Nabil Patel
+  - name: Nkateko Mawelele
+
+date: "September 29, 2025"
+embed-resources: true
+format: html
+---
+
+[REPORT]

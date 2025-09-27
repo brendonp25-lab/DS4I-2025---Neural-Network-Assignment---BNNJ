@@ -1,0 +1,36 @@
+---
+title: "LLM Usage and Reflection"
+embed-resources: true
+---
+
+## AI Statement
+Our group extensively utilized multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI, Grok by xAI, and Gemini by Google. All interactions were documented and archived in a dedicated Claude project for complete traceability ([Project link](https://claude.ai/project/019951cd-3a04-742b-98ed-7e5a81ecbea7)).
+
+## Phases of AI Utilization
+AI tools supported key stages of our data science workflow:
+
+- **Exploratory Data Analysis (EDA)**: Assisted in identifying trends and patterns in the Scotland avalanche forecasts dataset.
+- **Model Development and Preprocessing**: Provided guidance on handling missing data imputation, outlier detection/treatment, and class imbalance. Suggested methods included median imputation by geographic area for numerical variables, mode imputation by area for categorical variables, and context-specific outlier thresholds (e.g., capping altitude at Scotland's highest peak of 1,345m).
+- **Code Development**: Generated comprehensive R code using keras3 and TensorFlow, based on our EDA findings and requirements. Key prompts covered outlier assessment, missing value strategies, model architecture (including Random Forest feature selection and hyperparameter tuning via grid search), and data splitting (e.g., adjusting from 80/10/10 to 70/15/10 ratios). Also aided debugging, such as transitioning from manual upsampling to ROSE techniques.
+- **Report Writing and Review**: Helped draft analysis sections, interpret evaluation metrics, and perform proofreading, spell-checking, and grammar verification.
+
+We maintained critical oversight: All AI-generated content was verified against avalanche forecasting literature and Scottish meteorological standards, with code tested for functionality in our dataset context.
+
+## Benefits and Verification
+AI integration offered substantial advantages:
+- Accelerated timelines and exposure to advanced techniques.
+- Comprehensive code documentation and creative problem-solving.
+
+Accuracy was verified through:
+- Cross-referencing with peer-reviewed research.
+- Systematic code testing and manual spot-checks.
+- Comparing outputs across tools for inconsistencies.
+- Domain-specific evaluation of methodologies.
+
+## Critical Reflection
+AI tools demonstrated significant strengths but also limitations:
+
+- **Advantages**: Excelled in generating syntactically correct code and providing creative solutions, enhancing efficiency and innovation.
+- **Limitations**: Occasionally suggested technically sound but contextually unsuitable approaches, lacking nuance in domain-specific factors (e.g., Scottish mountain meteorology). Different tools sometimes gave conflicting advice, requiring synthesis and judgment.
+
+Ultimately, AI serves as a powerful assistant but cannot replace human critical thinking, domain expertise, or methodological rigor. This project highlighted the importance of thoughtful, transparent AI use to amplify capabilities while maintaining control.
