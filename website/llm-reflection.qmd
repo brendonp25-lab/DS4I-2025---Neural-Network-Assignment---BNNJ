@@ -60,4 +60,13 @@ Ultimately, AI serves as a powerful assistant but cannot replace human critical 
 
 ### Chats from Grok
 
+[EDA and initial Model Development](https://x.com/i/grok/share/bO0WtyhgHe3Lwxdk7bLfX5f3c)
+
+[Model Refinement](https://x.com/i/grok/share/6w5tC2QlUN4ByqzjyQT9wQ0R4)
+
+[Model Debugging](https://x.com/i/grok/share/Eh2o6rqigg66NEN8JBh9D2GnD)
+
+[Markdown format & Webpage hosting](https://x.com/i/grok/share/bW0AYWkA3lrg2qNgfTDezi2fS)
+
+
 ### Chats from ChatGPT
