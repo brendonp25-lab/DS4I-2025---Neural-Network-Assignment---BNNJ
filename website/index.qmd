@@ -1,8 +1,17 @@
 ---
 title: "STA5073Z Assignment 1: Avalanche Hazard Prediction "
 embed-resources: true
+format: 
+  html:
+    theme: sais-theme.scss
 ---
 Welcome to our Avalanche Hazard Prediction project.  
 - [Scientific Paper](paper.html)  
 - [LLM Reflection](llm-reflection.html)  
+- [Appendix](appendix.html)  
 
+images/snow-avalanche.jpg
+:fig-align: center
+:width: 100%
+Avalanche Hazard Visualization.  
+Source: [wallpapers.com](https://wallpapers.com/images/hd/snow-avalanche-slope-c47otzy245cyegah.jpg)

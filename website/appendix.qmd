@@ -1,0 +1,46 @@
+---
+title: "Appendix"
+embed-resources: true
+format: 
+  html:
+    theme: sais-theme.scss
+---
+
+# Data
+The following table provides descriptions, datatypes, and basic distributional analysis for the dataset variables.
+
+| Column            | Data Type | Example       | Definition                                                                 | NA's/Blanks | Missing Percentage (%) | Min      | 1st Qu | Median | Mean   | 3rd Qu | Max     |
+|-------------------|-----------|---------------|----------------------------------------------------------------------------|-------------|-------------------------|----------|--------|--------|--------|--------|---------|
+| Date              | date      | 17/12/2009 12:30 | The date and time when the observation or forecast was recorded.          | 0           | 0                       | -        | -      | -      | -      | -      | -       |
+| Area              | chr       | Creag Meagaidh | The specific mountain region or forecast area in Scotland (e.g., Creag Meagaidh, Torridon). | 0           | 0                       | -        | -      | -      | -      | -      | -       |
+| longitude         | num       | -0.392        | The longitude coordinate of the observation location in decimal degrees.  | 0           | 0                       | -1.2021 | -0.5424| -0.4315| -0.3984| -0.2705| 0.5701  |
+| latitude          | num       | 2.22          | The latitude coordinate of the observation location in decimal degrees.   | 0           | 0                       | 1.361    | 1.982  | 2.198  | 2.298  | 2.711  | 3.08    |
+| Alt               | int       | 800           | Altitude of the observation site in meters above sea level.               | 6           | 0.05622716              | -1       | 800    | 910    | 934    | 1030   | 244859  |
+| Aspect            | int       | 160           | The compass direction (in degrees) that the slope faces, relevant to avalanche risk. | 355         | 3.3267735               | -1       | 50     | 90     | 153.2  | 225    | 163770  |
+| Incline           | int       | 28            | The slope angle (in degrees) where the observation was taken, critical for avalanche potential. | 36          | 0.33736295              | -1       | 22     | 28     | 26.76  | 32     | 1020    |
+| Obs               | chr       | WS            | Observation type or condition code (e.g., WS for Wet Snow, TR for Tracks), indicating snow or terrain state. | 21          | 0.197795988             | -        | -      | -      | -      | -      | -       |
+| FAH               | chr       | Moderate      | Forecast Avalanche Hazard, the predicted avalanche danger level for the next 24 hours. | 109         | 1.026655364             | -        | -      | -      | -      | -      | -       |
+| OAH               | chr       | Moderate      | Observed Avalanche Hazard, the assessed avalanche danger based on current field observations. | 453         | 4.266742018             | -        | -      | -      | -      | -      | -       |
+| Air.Temp          | num       | -3.2          | Air temperature (in °C) at the observation site, influencing snow stability. | 34          | 0.31862056              | -10.8    | -2.1   | -0.2   | 0.06021| 2.1    | 17      |
+| Wind.Dir          | num       | 45            | Wind direction (in degrees) affecting snow distribution and drift formation. | 158         | 1.48064849              | -2.6     | 150    | 220    | 202.1  | 270    | 905     |
+| Wind.Speed        | num       | 10            | Wind speed (in km/h or mph), impacting snow transport and avalanche risk. | 53          | 0.49667323              | -2       | 8      | 15     | 16.34  | 22     | 290     |
+| Cloud             | int       | 90            | Cloud cover percentage, affecting temperature and precipitation patterns. | 29          | 0.2717646               | -1       | 70     | 100    | 80.21  | 100    | 199     |
+| Precip.Code       | chr       | 2 - Trace     | Precipitation code indicating type and intensity (e.g., snow, rain, trace). | 583         | 5.491193369             | -        | -      | -      | -      | -      | -       |
+| Drift             | int       | 1             | Indicator of snow drifting (1 = present, 0 = absent), affecting stability. | 0           | 0                       | -        | -      | -      | -      | -      | -       |
+| Total.Snow.Depth  | int       | 45            | Total depth of snow cover (in cm) at the observation site.                | 163         | 1.52750445              | -1       | 45     | 70     | 95.75  | 118    | 3000    |
+| Foot.Pen          | num       | 0             | Foot penetration depth (in cm), indicating snowpack consistency.          | 42          | 0.3935901               | -1       | 5      | 10     | 13.96  | 20     | 300     |
+| Ski.Pen           | int       | NA            | Ski penetration depth (in cm), showing snowpack support for skiing.       | 2404        | 22.52834786             | -1       | 0      | 0      | 0.5928 | 0      | 55      |
+| Rain.at.900       | int       | 0             | Rainfall at 900m altitude (in mm or binary indicator), affecting snow melt. | 0           | 0                       | 0        | 0      | 0      | 0.1912 | 0      | 1       |
+| Summit.Air.Temp   | num       | NA            | Air temperature (in °C) at the summit, influencing upper snowpack conditions. | 754         | 7.06587949              | -13.4    | -3.6   | -1.3   | -1.24  | 0.8    | 15      |
+| Summit.Wind.Dir   | int       | NA            | Wind direction (in degrees) at the summit, impacting snow distribution.   | 1318        | 12.35123231             | -2       | 160    | 220    | 200.1  | 250    | 2213    |
+| Summit.Wind.Speed | int       | NA            | Wind speed (in km/h or mph) at the summit, affecting snow transport.      | 909         | 8.51841439              | -8       | 14     | 25     | 27.89  | 38     | 360     |
+| Max.Temp.Grad     | num       | 20            | Maximum temperature gradient (in °C) across the snowpack, indicating instability. | 710         | 6.653547                | 0        | 0      | 0.2    | 1.211  | 1      | 130     |
+| Max.Hardness.Grad | int       | 4             | Maximum hardness gradient within the snowpack, reflecting layer differences. | 629         | 5.89448037              | 0        | 1      | 2      | 2.037  | 3      | 5       |
+| No.Settle         | int       | NA            | Number of days since the last significant snowfall, affecting settlement. | 289         | 2.70827476              | -1       | 54     | 128    | 139.1  | 206    | 676     |
+| Snow.Index        | int       | NA            | An index or score related to snowpack stability or quality (specific method unclear). | 745         | 6.98153875              | -1       | 0      | 0      | 1.786  | 0      | 368     |
+| Insolation        | int       | NA            | Solar radiation or insolation impact (in hours or intensity), affecting snow melt. | 507         | 4.75119483              | -55      | 3      | 6      | 7.594  | 10     | 208     |
+| Crystals          | int       | NA            | Type or size of snow crystals observed, influencing avalanche risk.       | 988         | 9.25873864              | -1       | 0      | 0      | 1.45   | 0      | 15      |
+| Wetness           | int       | NA            | Degree of snow wetness (scale or percentage), impacting stability.        | 576         | 5.39780714              | -1       | 1      | 1      | 1.414  | 2      | 10      |
+| AV.Cat            | int       | NA            | Avalanche Category, likely a classification of avalanche type or severity. | 2494        | 23.37175522             | -9999    | 0      | 0      | -321.7 | 0      | 8800    |
+| Snow.Temp         | num       | NA            | Temperature (in °C) within the snowpack, critical for stability assessment. | 410         | 3.84218911              | -13.1    | -2.2   | -0.4   | -0.7149| 0      | 124     |
+{.table .table-bordered .table-striped .table-hover}

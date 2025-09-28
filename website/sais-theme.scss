@@ -1,0 +1,25 @@
+/*-- scss:defaults --*/
+$primary: #005eb8; // Main blue for links, buttons
+$secondary: #71c5e8; // Light blue accents
+$info: #002d54; // Dark blue for headers
+$body-bg: #f8faff; // Light blueish background
+$body-color: #333333; // Text color
+
+/*-- scss:rules --*/
+body {
+  background-color: $body-bg;
+  color: $body-color;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: $info;
+}
+
+a {
+  color: $primary;
+}
+
+.navbar {
+  background-color: $info !important;
+}
+

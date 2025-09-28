@@ -11,5 +11,7 @@ website:
         text: Scientific Paper
       - href: llm-reflection.html
         text: LLM Reflection
+      - href: appendix.html
+        text: Appendix
 
 

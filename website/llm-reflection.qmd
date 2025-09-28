@@ -1,10 +1,13 @@
 ---
 title: "LLM Usage and Reflection"
 embed-resources: true
+format: 
+  html:
+    theme: sais-theme.scss
 ---
 
 ## AI Statement
-Our group extensively utilized multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI, Grok by xAI, and Gemini by Google. All interactions were documented and archived in a dedicated Claude project for complete traceability ([Project link](https://claude.ai/project/019951cd-3a04-742b-98ed-7e5a81ecbea7)).
+Our group extensively utilized multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI, Grok by xAI, and Gemini by Google. All interactions were documented and archived in a dedicated Claude project for complete traceability.
 
 ## Phases of AI Utilization
 AI tools supported key stages of our data science workflow:
@@ -34,3 +37,5 @@ AI tools demonstrated significant strengths but also limitations:
 - **Limitations**: Occasionally suggested technically sound but contextually unsuitable approaches, lacking nuance in domain-specific factors (e.g., Scottish mountain meteorology). Different tools sometimes gave conflicting advice, requiring synthesis and judgment.
 
 Ultimately, AI serves as a powerful assistant but cannot replace human critical thinking, domain expertise, or methodological rigor. This project highlighted the importance of thoughtful, transparent AI use to amplify capabilities while maintaining control.
+
+## LLM prompt links
