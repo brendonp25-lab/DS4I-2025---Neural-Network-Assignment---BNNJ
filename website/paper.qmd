@@ -39,7 +39,7 @@ Avalanche forecasting looks to improving consistency, calibration, and timelines
 
 ## Dataset
 
-The dataset is an operational archive produced by the Scottish Avalanche Information Service (SAIS). It spans approximately fifteen winter seasons and reflects real-time fieldwork. Forecasters collect these records in severe weather environments and under time constraints. As a result, the data shows uneven sampling across storm cycles and regions, along with missing entries during periods of limited access.
+The dataset is an operational archive produced by the Scottish Avalanche Information Service (SAIS). It spans approximately fifteen winter seasons and reflects real-time fieldwork. Forecasters collect these records in severe weather environments and under time constraints. As a result, the data shows uneven sampling across storm cycles and regions, along with missing entries during periods of limited access. The various features of the dataset can be seen in [Appendix](appendix.html)
 
 The feature set can be categorised into five distinct groups that collectively capture the multifaceted nature of avalanche risk assessment:
 
@@ -69,7 +69,7 @@ A three-layer deep neural network was implemented using Keras/TensorFlow with pr
 
 The final model was trained for up to 150 epochs with early stopping and learning rate reduction callbacks. Evaluation employed both standard multiclass metrics (accuracy, precision, recall, F1-score) and ordinal-specific measures including adjacent accuracy (±1 level), mean absolute error, and safety-critical metrics such as conservative bias and critical miss rates. This comprehensive evaluation framework assessed both predictive performance and operational safety implications for avalanche forecasting.
 
-We used large language models (LLMs) to accelerate routine coding tasks. Each team member supplied an LLM with a structured brief (data schema, variable descriptions, target definition, leakage constraints, evaluation metrics) to draft boilerplate R code for preprocessing, imputation functions, model scaffolding (keras3), and plotting. To promote diversity of ideas and reduce single-model bias, different teammates intentionally used different LLMs. This use of LLMs sped up drafting, but final code, methodological choices, and validation remained human-curated. Our detailed statement on the use of generative artifical intelligence (AI) is included in [LLM Usage and Reflection](llm-reflection.html). In the next section, we initiated exploratory data analysis (EDA) before developing our model. 
+We used large language models (LLMs) to accelerate routine coding tasks. Each team member supplied an LLM with a structured brief (data schema, variable descriptions, target definition, leakage constraints, evaluation metrics) to draft boilerplate R code for preprocessing, imputation functions, model scaffolding (keras3), and plotting. To promote diversity of ideas and reduce single-model bias, different teammates intentionally used different LLMs. This use of LLMs sped up drafting, but final code, methodological choices, and validation remained human-curated. Our detailed statement on the use of generative artificial intelligence (AI) is included in [LLM Usage and Reflection](llm-reflection.html). In the next section, we initiated exploratory data analysis (EDA) before developing our model. 
 
 ## Exploratory Data Analysis
 
@@ -121,7 +121,7 @@ The correlation heatmap in @fig-correlation-heatmap reveals coherent but mostly 
 
 ### EDA Conclusion
 
-The target variable (FAH) exhibits severe class imbalance, with safer conditions (Low and Moderate) dominating approximately 63% of observations whilst higher-risk categories (Considerable+ and High) remain rare.  To address this imbalance, ROSE sampling was applied to the training data using a one-versus-rest strategy, generating synthetic samples to achieve more balanced class distributions whilst preserving natural distributions in validation and test sets. Missing data patterns reveal structured gaps rather than random missingness. Variables **AV.Cat** and **Ski.Pen** show the highest missingness rates (>20%), prompting their removal during preprocessing. Additional moderate gaps appear in snowpack microstructure variables and certain meteorological fields, leading to the implementation of imputation strategies for missing data. The temporal analysis confirms expected seasonal patterns, with observations concentrated heavily in winter months (December-March) across a consistent 16-year span from 2009-2025. This seasonal clustering directly motivated the creation of temporal features including month, day of year, and season variables, whilst the stable annual collection volumes validate the dataset's temporal consistency for model training. Forecast verification analysis comparing FAH versus OAH reveals overall accuracy of approximately 70-75%, with performance varying substantially across risk levels. Accuracy peaks for Low risk conditions (mid-90s%) but deteriorates progressively through higher-risk categories, reaching lowest levels for Considerable+ (35%). This pattern highlights the inherent difficulty in distinguishing adjacent hazard boundaries, directly informing the adoption of ordinal-specific evaluation metrics including adjacent accuracy (±1 level), critical miss rates, and high-risk sensitivity measures rather than relying solely on overall classification accuracy. The following section discusses our data refinement stategy.
+The target variable (FAH) exhibits severe class imbalance, with safer conditions (Low and Moderate) dominating approximately 63% of observations whilst higher-risk categories (Considerable+ and High) remain rare.  To address this imbalance, ROSE sampling was applied to the training data using a one-versus-rest strategy, generating synthetic samples to achieve more balanced class distributions whilst preserving natural distributions in validation and test sets. Missing data patterns reveal structured gaps rather than random missingness. Variables **AV.Cat** and **Ski.Pen** show the highest missingness rates (>20%), prompting their removal during preprocessing. Additional moderate gaps appear in snowpack microstructure variables and certain meteorological fields, leading to the implementation of imputation strategies for missing data. The temporal analysis confirms expected seasonal patterns, with observations concentrated heavily in winter months (December-March) across a consistent 16-year span from 2009-2025. This seasonal clustering directly motivated the creation of temporal features including month, day of year, and season variables, whilst the stable annual collection volumes validate the dataset's temporal consistency for model training. Forecast verification analysis comparing FAH versus OAH reveals overall accuracy of approximately 70-75%, with performance varying substantially across risk levels. Accuracy peaks for Low risk conditions (mid-90s%) but deteriorates progressively through higher-risk categories, reaching lowest levels for Considerable+ (35%). This pattern highlights the inherent difficulty in distinguishing adjacent hazard boundaries, directly informing the adoption of ordinal-specific evaluation metrics including adjacent accuracy (±1 level), critical miss rates, and high-risk sensitivity measures rather than relying solely on overall classification accuracy. The following section discusses our data refinement strategy.
 
 ## Data Refinement
 
@@ -135,7 +135,7 @@ We eliminated 109 observations lacking FAH values, leaving 10 562 viable records
 
 ### Outlier Removal
 
-Our outlier removal strategy involved a dual-tier outlier detection protocol compining statistical principles with domain expertise. Initially, we converted string representations of missing values to proper NA indicators and applied robust Interquartile Range filtering (with a swift scalar parameter of k=3.5) to meteorological variables prone to measurement errors i.e.:
+Our outlier removal strategy involved a dual-tier outlier detection protocol combining statistical principles with domain expertise. Initially, we converted string representations of missing values to proper NA indicators and applied robust Interquartile Range filtering (with a scalar parameter of k=3.5) to meteorological variables prone to measurement errors i.e.:
  
 - **Alt** (2) 
 - **Wind.Speed** (22)
@@ -156,7 +156,7 @@ Missing value imputation employed a hierarchical approach reflecting the spatial
 
 ### Encoding
 
-The next step in our model involved encoding encoded categorical features and the target variable. Target encoding transformed the categorical FAH variable into an ordinal integer sequence (Low=0, Moderate=1, Considerable-=2, Considerable+=3, High=4), preserving the natural risk hierarchy essential for ordinal classification evaluation. For predictors, we cleaned categorical fields and applied a frequency threshold (≥50) so very rare levels were folded into “Other” to limit sparsity. 
+The next step in our model involved encoding categorical features and the target variable. Target encoding transformed the categorical FAH variable into an ordinal integer sequence (Low=0, Moderate=1, Considerable-=2, Considerable+=3, High=4), preserving the natural risk hierarchy essential for ordinal classification evaluation. For predictors, we cleaned categorical fields and applied a frequency threshold (≥50) so very rare levels were folded into “Other” to limit sparsity. 
 
 ### Feature Selection
 
@@ -170,12 +170,23 @@ The refined dataset of 7 530 observations underwent stratified partitioning to m
 
 Class imbalance in the training set showed a severe 12.4:1 ratio between majority and minority classes, necessitating corrective sampling. We applied ROSE exclusively to training data post-split to prevent data leakage, using an iterative one-versus-rest strategy to accommodate ROSE's binary classification requirement. Synthetic samples were generated for minority classes until reaching approximately 95% of majority class size, avoiding perfect balance that might introduce artificial patterns.
 
-The enhanced training set expanded from 5,273 to 8,641 observations with roughly 1,700 samples per class, reducing imbalance to 1.05:1 (91.5% improvement). This substantial rebalancing provides the neural network with sufficient minority class examples for effective learning whilst maintaining natural class distributions in validation and test sets for unbiased performance evaluation.
+The training set grew from 5,273 to 8,641 samples, with ~1,700 per class, reducing the imbalance ratio to 1.05:1 (a 91.5% improvement). This enhanced minority representation for neural network training while ensuring realistic evaluation.
+
+![Test data class distribution](../R work/Graphs/fig13.jpg){#fig-Test-data-distribution fig-cap="Test data class distribution"}
+
+<br>
+ 
+Rose Balanced Training Data:
+
+![ROSE Balanced test data class distribution](../R work/Graphs/fig12.jpg){#fig-Test-data-distribution fig-cap="ROSE Balanced test data class distribution"}
+
+
 
 ### Neural Network Architecture
 
-After hyperparameter tuning across three candidate configurations, the optimal network achieved a validation accuracy of 0.6138 with a corresponding training accuracy of 0.7159. This represented the best trade-off between learning capacity and generalisation. The final architecture consisted of three hidden layers with 512, 256, and 128 units, respectively, paired with progressively increasing dropout regularisation (0.20, 0.30, 0.40). Gaussian noise was applied at the input layer to mitigate overfitting and improve robustness against noisy environmental predictors. The network was trained using the Adam optimiser with a learning rate of 5×10⁻⁴ and a batch size of 32, which provided stable convergence during training.
+Following various hyperparameter tuning with three candidate configurations, the optimal network achieved a validation accuracy of 0.6138  with a corresponding training accuracy of 0.7159. This represented the best trade-off between learning capacity and generalisation. The final architecture consisted of three hidden layers with 512, 256, and 128 units, respectively, paired with progressively increasing dropout regularisation (0.20, 0.30, 0.40). Gaussian noise was applied at the input layer to mitigate overfitting and improve robustness against noisy environmental predictors. The network was trained using the Adam optimiser with a learning rate of 5×10⁻⁴ and a batch size of 32, which provided stable convergence during training.
 
+::: {.centered-table}
 | Layer          | Units | Dropout | Notes                             |
 |----------------|-------|---------|-----------------------------------|
 | Input          | –     | –       | 25 selected features              |
@@ -184,22 +195,31 @@ After hyperparameter tuning across three candidate configurations, the optimal n
 | Hidden Layer 3 | 128   | 0.40    | Dense + BatchNorm + Dropout       |
 | Output         | 5     | –       | Softmax (multiclass, ordinal)     |
 
-*Table 1: Final neural network architecture*
+Table 1: Final neural network architecture
+:::
 
 The training and validation curves showed that the model achieved stable convergence, though validation accuracy plateaued around 0.61, reflecting the intrinsic difficulty of predicting the rare high-risk classes.
+
+The model accuracy can be seen by:
+
+![Model Accuracy](../R work/Graphs/fig8.jpg){#fig-Model-Accuracy fig-cap="Model Accuracy"}
+
+<br>
+
+The model loss can be seen by:
+
+![Model Loss](../R work/Graphs/fig9.jpg){#fig-Model-Loss fig-cap="Model Loss"}
+
 
 ## Model Performance Evaluation
 
 ### Overall Performance
 
-The neural network’s performance was assessed across the training, validation, and test datasets to evaluate both its learning capacity and generalisation ability. During training, the model achieved a best training accuracy of 71.6%, with the corresponding best validation accuracy reaching 61.4%. The final test accuracy was 60.6% (loss = 0.993). The gap between training and validation performance indicates some overfitting, which is expected in complex models, but the close alignment of validation and test results shows that the network generalised reasonably well to unseen data and avoided substantial performance degradation. 
+The neural network’s performance was assessed across the training, validation, and test datasets to evaluate both its learning capacity and generalisation ability. During training, the model achieved a best training accuracy of 71.6%, with the corresponding best validation accuracy reaching 61.4%. The final test accuracy was 60.6% (loss = 0.993). The gap between training and validation performance indicates some overfitting, which is expected in complex models, but the close alignment of validation and test results shows that the network generalised reasonably well to unseen data and avoided substantial performance degradation. Beyond test accuracy, complementary metrics provided deeper insight into generalization. 
 
-Beyond test accuracy, complementary metrics provided deeper insight into generalisation. Macro-averaged scores (precision = 0.499, recall = 0.452, F1 = 0.459) showed that the model was only moderately effective when treating all classes equally. Weighted averages were higher (precision = 0.589, recall = 0.606, F1 = 0.594), reflecting stronger performance on the dominant classes. Cohen’s Kappa, at 0.443, placed the model in the “moderate agreement” range, showing that predictions were significantly better than random guessing but not yet highly reliable. EDA findings again provide explanation: the removal of several snowpack variables with >20% missingness reduced the depth of predictive features, while extreme but plausible outliers (e.g., very high winds, deep snowpack events) complicated the learning process, particularly for rarer hazard categories.
+The various performance metrics are summarised below:
 
-Given the ordinal nature of avalanche hazard levels, error magnitudes were as important as raw accuracy. Predictions deviated by an average of only 0.45 hazard levels (MAE), with relatively low dispersion (RMSE = 0.765; MSE = 0.585). Adjacent accuracy was exceptionally high (94.5% within ±1 level), while extreme misclassifications were nearly absent (99.5% within ±2 levels; 100% within ±3 levels). These findings confirm that catastrophic errors (e.g., predicting Low when the true level was High) were virtually eliminated. This aligns with EDA evidence showing that extreme meteorological conditions such as heavy snowfall or very strong winds rarely overlapped with Low hazard conditions, providing the model with clearer separation at the extremes.
-
-Finally, correlation-based metrics confirmed that the network preserved the ordinal structure of avalanche hazard levels. Strong monotonic associations were observed (Spearman’s ρ = 0.738, Pearson r = 0.723), with Kendall’s Tau (0.670, p < 0.001) and directional accuracy (0.718) showing that the ordering of predicted hazard levels was largely consistent with the true sequence. Together, these results show that while the model achieved only moderate exact-match classification accuracy, it maintained ordinal consistency, avoided severe misclassifications, and delivered meaningful improvements over baseline predictors.
-
+::: {.centered-table}
 | Metric                         | Value   |
 |--------------------------------|---------|
 | Training Accuracy              | 0.716   |
@@ -224,18 +244,21 @@ Finally, correlation-based metrics confirmed that the network preserved the ordi
 | Kendall’s Tau                  | 0.670   |
 | Directional Accuracy           | 0.718   |
 
-*Table 2: Overall Performance Metrics of the Neural Network*
+Table 2: Overall Performance Metrics of the Neural Network
+:::
+
+Macro-averaged scores (precision = 0.499, recall = 0.452, F1 = 0.459) showed that the model was only moderately effective when treating all classes equally. Weighted averages were higher (precision = 0.589, recall = 0.606, F1 = 0.594), reflecting stronger performance on the dominant classes. Cohen’s Kappa, at 0.443, placed the model in the “moderate agreement” range, showing that predictions were significantly better than random guessing but not yet highly reliable. EDA findings again provide explanation: the removal of several snowpack variables with >20% missingness reduced the depth of predictive features, while extreme but plausible outliers (e.g., very high winds, deep snowpack events) complicated the learning process, particularly for rarer hazard categories.
+
+Given the ordinal nature of avalanche hazard levels, error magnitudes were as important as raw accuracy. Predictions deviated by an average of only 0.45 hazard levels (MAE), with relatively low dispersion (RMSE = 0.765; MSE = 0.585). Adjacent accuracy was exceptionally high (94.5% within ±1 level), while extreme misclassifications were nearly absent (99.5% within ±2 levels; 100% within ±3 levels). These findings confirm that catastrophic errors (e.g., predicting Low when the true level was High) were virtually eliminated. This aligns with EDA evidence showing that extreme meteorological conditions such as heavy snowfall or very strong winds rarely overlapped with Low hazard conditions, providing the model with clearer separation at the extremes.
+
+Finally, correlation-based metrics confirmed that the network preserved the ordinal structure of avalanche hazard levels. Strong monotonic associations were observed (Spearman’s ρ = 0.738, Pearson r = 0.723), with Kendall’s Tau (0.670, p < 0.001) and directional accuracy (0.718) showing that the ordering of predicted hazard levels was largely consistent with the true sequence. Together, these results show that while the model achieved only moderate exact-match classification accuracy, it maintained ordinal consistency, avoided severe misclassifications, and delivered meaningful improvements over baseline predictors.
+
 
 ### Confusion Matrix and Class-Level Performance
 
-The confusion matrix offered a clear breakdown of how the model performed across individual hazard levels. For the Low hazard class, the network achieved strong results (sensitivity = 0.836, precision = 0.723, F1 = 0.775), reflecting consistent identification of stable snowpack conditions. This strength is consistent with EDA findings, which showed that Low days were associated with distinct signals — shallow snow depth, weak drift, and stable temperature gradients — making them easier for the model to separate. Similarly, the Moderate class reached moderate reliability (sensitivity = 0.540, precision = 0.578, F1 = 0.558), supported by its high prevalence in the dataset and relatively consistent meteorological profiles. Together, these two classes accounted for most correct predictions, reflecting both their dominance in the dataset and their clearer predictor signatures.
+The confusion matrix offered a clear breakdown of how the model performed across individual hazard levels:
 
-The Considerable– class performed less consistently (precision = 0.526, recall = 0.553, F1 = 0.539). Misclassifications were concentrated between adjacent levels: 79 cases confused with Moderate and 20 with Considerable+. This behavior aligns with the transitional nature of predictors highlighted in the EDA, where snow depth, crystal type, and summit air temperature overlapped substantially between Moderate and Considerable– categories.
-
-Performance deteriorated sharply for the Considerable+ and High hazard levels, which achieved very low recall (0.241 and 0.091, respectively) and correspondingly low F1-scores (0.280 and 0.143). High cases were most often misclassified as Considerable– (14 cases) or Considerable+ (15 cases), but crucially, none were mistaken for Low. This indicates that while the model struggled to distinguish among upper hazard levels, it preserved ordinal structure and avoided catastrophic misclassifications. The EDA findings explain this limitation: these rare categories comprised less than 5% of the dataset and were characterised by overlapping meteorological signals such as heavy snowfall, wind drift, and deep weak layers. With limited training samples, the network could not fully disentangle these patterns.
-
-The per-class F1-scores reflected this gradient in performance: Low (0.775) and Moderate (0.558) were acceptable, Considerable– was moderate (0.539), while Considerable+ (0.280) and High (0.143) were poor. These values highlight the central trade-off of the model: strong utility in predicting stable and moderately unstable conditions, but weak reliability in capturing rare but operationally critical high-risk categories.
-
+::: {.centered-table}
 | Predicted \ Actual | Low | Moderate | Considerable – | Considerable + | High |
 |--------------------|-----|----------|----------------|----------------|------|
 | Low                | 315 | 105      | 11             | 5              | 0    |
@@ -244,8 +267,14 @@ The per-class F1-scores reflected this gradient in performance: Low (0.775) and 
 | Considerable +     | 0   | 5        | 20             | 20             | 15   |
 | High               | 0   | 0        | 4              | 2              | 3    |
 
-*Table 3: Confusion Matrix of Predicted vs Actual Avalanche Hazard Levels*
+Table 3: Confusion Matrix of Predicted vs Actual Avalanche Hazard Levels
+:::
 
+<br>
+
+From the confusion matrix, following hazard-level model performance metrics were obtained:
+
+::: {.centered-table}
 | Class           | Precision | Recall | F1-Score | Support |
 |-----------------|-----------|--------|----------|---------|
 | Low             | 0.723     | 0.836  | 0.775    | 377     |
@@ -254,37 +283,57 @@ The per-class F1-scores reflected this gradient in performance: Low (0.775) and 
 | Considerable +  | 0.333     | 0.241  | 0.280    | 83      |
 | High            | 0.333     | 0.091  | 0.143    | 33      |
 
-*Table 4: Precision, Recall, and F1-Score by Avalanche Hazard Class*
+Table 4: Precision, Recall, and F1-Score by Avalanche Hazard Class
+:::
 
+For the Low hazard class, the network achieved strong results (precision = 0.723, recall = 0.836, F1 = 0.775), reflecting consistent identification of stable snowpack conditions. This strength is consistent with EDA findings, which showed that Low days were associated with distinct signals — shallow snow depth, weak drift, and stable temperature gradients — making them easier for the model to separate. Similarly, the Moderate class reached moderate reliability (precision = 0.578, recall = 0.540, F1 = 0.558). Together, these two classes accounted for most correct predictions, reflecting both their dominance in the dataset and their clearer predictor signatures.
 
+The Considerable– class performed less consistently (precision = 0.526, recall = 0.553, F1 = 0.539). Misclassifications were concentrated between adjacent levels: 79 cases confused with Moderate and 20 with Considerable+.
+
+Performance deteriorated sharply for the Considerable+ and High hazard levels, which achieved very low recall (0.241 and 0.091, respectively) and correspondingly low F1-scores (0.280 and 0.143). High cases were most often misclassified as Considerable– (14 cases) or Considerable+ (15 cases), but crucially, none were mistaken for Low. This indicates that while the model struggled to distinguish among upper hazard levels, it preserved ordinal structure and avoided catastrophic misclassifications. The EDA findings explain this limitation: these rare categories comprised less than 5%. With limited training samples, the network could not fully disentangle these patterns.
+
+The per-class F1-scores reflected this gradient in performance: Low (0.775) and Moderate (0.558) were acceptable, Considerable– was moderate (0.539), while Considerable+ (0.280) and High (0.143) were poor. These values highlight the central trade-off of the model: strong utility in predicting stable and moderately unstable conditions, but weak reliability in capturing rare but operationally critical high-risk categories.
 
 ### Confidence-Based Reliability
 
+To evaluate the reliability of the model's predictions, we examined the distribution of confidence scores and their associated accuracy across different levels.
+
+::: {.centered-table}
+| Confidence Level   | Count | Percentage |
+|--------------------|-------|------------|
+| High (> 0.8)       | 159   | 14.1%      |
+| Medium (0.6–0.8)   | 259   | 23.0%      |
+| Low (≤ 0.6)        | 710   | 62.9%      |
+ 
+Table 5: Distribution of Predictions by Confidence Level
+:::
+
+ <br>
+
+::: {.centered-table}
+| Confidence Level   | Accuracy |
+|--------------------|----------|
+| High (> 0.8)       | 88.7%    |
+| Medium (0.6–0.8)   | 65.3%    |
+| Low (≤ 0.6)        | 52.7%    |
+
+Table 6: Accuracy of Predictions by Confidence Level
+:::
+
+<br>
+
+The prediction confidence distribution can be seen by:
+
+![Prediction Confidence Distribution](../R work/Graphs/fig11.jpg){#fig-Prediction-Confidence-Distribution fig-cap="Prediction Confidence Distribution"}
+
 Most predictions were made with low confidence (≤0.6, 62.9%), while 23.0% were medium (0.6–0.8) and only 14.1% were high (>0.8). Prediction accuracy scaled with confidence: 88.7% at high confidence, 65.3% at medium, and 52.7% at low confidence. At the class level, Low hazard predictions averaged the highest confidence (0.708) with strong accuracy (83.6%), while Moderate (0.551) and Considerable– (0.511) showed low confidence and middling reliability.Predictions for Considerable+ (0.527) and High (0.584) carried similarly low confidence but were far less accurate (24.1% and 9.1%, respectively), highlighting systematic difficulty with rare high-risk categories. These results confirm that prediction probabilities provided a meaningful gradient of reliability, with higher confidence strongly associated with higher accuracy.
-
-| Confidence Level   | Accuracy |
-|--------------------|----------|
-| High (> 0.8)       | 88.7%    |
-| Medium (0.6–0.8)   | 65.3%    |
-| Low (≤ 0.6)        | 52.7%    |
-
-*Table 5: Accuracy of Predictions by Confidence Level*
-
-
-| Confidence Level   | Accuracy |
-|--------------------|----------|
-| High (> 0.8)       | 88.7%    |
-| Medium (0.6–0.8)   | 65.3%    |
-| Low (≤ 0.6)        | 52.7%    |
-
-*Table 6: Accuracy of Predictions by Confidence Level*
-
 
 
 ### Avalanche-Specific Safety Metrics
 
 The model achieved a Critical Miss Rate of 18.1%, showing that nearly one in five severe avalanche cases (Considerable+ or High) were underestimated as Low or Moderate. Safety Effectiveness reached 74.6%, indicating that in most cases the model predicted at or above the true hazard level. A negative Conservative Bias (–0.114) revealed a mild tendency to underestimate risk overall. High-risk detection showed mixed outcomes: Sensitivity was 70.1%, meaning most but not all severe cases were detected, while Specificity was 89.8%, reflecting strong reliability in avoiding false alarms.
 
+::: {.centered-table}
 | Metric                   | Value   | Interpretation                                      |
 |--------------------------|---------|-----------------------------------------------------|
 | Critical Miss Rate       | 18.1%   | Severe events underestimated as Low/Moderate        |
@@ -293,8 +342,8 @@ The model achieved a Critical Miss Rate of 18.1%, showing that nearly one in fiv
 | High-Risk Sensitivity    | 70.1%   | Ability to detect Considerable– and above           |
 | High-Risk Specificity    | 89.8%   | Ability to avoid false alarms on lower-risk levels  |
 
-*Table 7: Avalanche-Specific Safety Metrics*
-
+Table 7: Avalanche-Specific Safety Metrics
+:::
 
 ## Feature Importance Assessment
 
@@ -304,11 +353,26 @@ Wind- and temperature-related factors such as Air Temperature, Wind Chill, and W
 
 In summary, the most important features reflected a combination of snowpack properties, meteorological drivers, and seasonal patterns, confirming that the model’s predictive behaviour was rooted in meaningful physical processes identified during the exploratory analysis.
 
-![Feature importance graphs](../R work/Graphs/fig7.jpg){#fig-feature-importance fig-cap="Feature importance graphs"}
+::: {.centered-table}
+| Rank | Feature               | Total Score |
+|------|-----------------------|-------------|
+| 1    | Foot Penetration      | 134.8       |
+| 2    | Drift                 | 114.6       |
+| 3    | Summit Air Temp       | 106.4       |
+| 4    | Total Snow Depth      | 92.0        |
+| 5    | Crystals              | 80.6        |
+| 6    | Air Temp              | 78.6        |
+| 7    | Wind Chill            | 65.5        |
+| 8    | Precip Code: None     | 65.2        |
+| 9    | Precip Code: Snow     | 64.1        |
+| 10   | Snow Index            | 63.6        |
+
+Table 8: Top 10 most important predictors of avalanche hazard
+:::
 
 ## Conclusion and Recommendations
 
-This study evaluated the application of a neural network model to forecast avalanche hazard levels in Scotland, integrating exploratory data analysis, feature engineering, and rigorous model evaluation.The neural network achieved a training accuracy of 71.6%, a validation accuracy of 61.4%, and a test accuracy of 60.6%, showing good generalisation without major overfitting. While exact classification accuracy was moderate, 94.5% of predictions were within ±1 hazard level, and errors averaged only 0.45 levels, indicating that the model preserved ordinal structure and avoided large-scale misclassifications. Performance was strongest for Low and Moderate hazards but much weaker for rare severe levels (Considerable+ and High), reflected in a Critical Miss Rate of 18.1% and a Safety Effectiveness of 74.6%
+This study evaluated the application of a neural network model to forecast avalanche hazard levels in Scotland, integrating exploratory data analysis, feature engineering, and rigorous model evaluation.The neural network achieved a training accuracy of 71.6%, a validation accuracy of 61.4%, and a test accuracy of 60.6%, showing good generalization without major overfitting. While exact classification accuracy was moderate, 94.5% of predictions were within ±1 hazard level, and errors averaged only 0.45 levels, indicating that the model preserved ordinal structure and avoided large-scale misclassifications. Performance was strongest for Low and Moderate hazards but much weaker for rare severe levels (Considerable+ and High), reflected in a Critical Miss Rate of 18.1% and a Safety Effectiveness of 74.6%
 
 Feature importance confirmed that avalanche risk was primarily driven by snowpack properties (Foot Penetration, Snow Depth, Crystal Type), wind-related processes (Drift, Wind Chill, Wind Speed), and temperature gradients (Summit Air Temperature, Air Temperature), alongside seasonal and regional influences.
 
@@ -321,24 +385,14 @@ To improve performance, future work should focus on better representation of hig
 - Nabil Patel: Formal Analysis, Methodology, Writing – Original Draft Preparation
 - Nkateko Mawelele: Formal Analysis, Writing – Original Draft Preparation  
 
-## References (APA)
-
-<a id="ref-bishop-2006"></a>Bishop, C. M. (2006). *Pattern recognition and machine learning*. Springer.
+## References
 
 <a id="ref-anthropic2024claude"></a>Anthropic. (2024). *Claude Sonnet 4 (December 28 version)* [Large language model]. https://claude.ai/chat
 
 <a id="ref-eaws-nd"></a>European Avalanche Warning Services. (n.d.). *Danger scale and standards*. https://www.avalanches.org
-
-<a id="ref-goodfellow-2016"></a>Goodfellow, I., Bengio, Y., & Courville, A. (2016). *Deep learning*. MIT Press.
-
-<a id="ref-juvik-2023"></a>Juvik, E. S. (2023). Toward data-driven decision support for avalanche-exposed roads in Norway. In *Proceedings of the International Snow Science Workshop* (ISSW 2023). Norwegian Public Roads Administration.
-
-<a id="ref-mcclung-2006"></a>McClung, D., & Schaerer, P. (2006). *The avalanche handbook* (3rd ed.). The Mountaineers Books.
 
 <a id="ref-sais-nd"></a>Scottish Avalanche Information Service. (n.d.). *About SAIS and daily avalanche reports*. https://www.sais.gov.uk
 
 <a id="ref-schweizer-2003"></a>Schweizer, J., Jamieson, B., & Schneebeli, M. (2003). Snow avalanche formation. *Reviews of Geophysics, 41*(4), 1–25. https://doi.org/10.1029/2002RG000123
 
 <a id="ref-techel-2014"></a>Techel, F., & Zweifel, B. (2014). Recreational avalanche accidents in Switzerland: Trends and patterns with an emphasis on burial, rescue methods and avalanche danger. *Cold Regions Science and Technology, 97*, 77–85. https://doi.org/10.1016/j.coldregions.2013.09.006
-
-<a id="ref-techel-2016"></a>Techel, F., Jarry, F., Kronthaler, G., Mitterer, C., Nairz, P., Pavšek, M., Valt, M., & Zweifel, B. (2016). Avalanche fatalities in the European Alps: Long-term trends and perspectives. *Cold Regions Science and Technology, 121*, 22–31. https://doi.org/10.1016/j.coldregions.2015.11.017

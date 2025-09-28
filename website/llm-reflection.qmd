@@ -71,5 +71,14 @@ Ultimately, AI serves as a powerful assistant but cannot replace human critical 
 
 ### Chats from ChatGPT
 
+[EDA and initial Model Development](https://chatgpt.com/g/g-TgjKDuQwZ-r-wizard/c/68c018fe-ea7c-8323-a7ab-7db317bf798b)
+
+[EDA and initial Model Development](https://chatgpt.com/share/68d9755a-5fe4-800e-8adb-9beb807ca7cb)
+
+[Model Refinement](https://chatgpt.com/g/g-TgjKDuQwZ-r-wizard/c/68cf959a-1178-8331-9d6b-50a9e7845331)
+
+[Model selection](https://chatgpt.com/share/68d997e2-4ac8-800e-a705-208c9f79864c)
+
+[Github Help](https://chatgpt.com/share/68d997a2-c5cc-800e-ab64-a48506a7db70)
 
 [^1]: Claude projects on the Claude Pro plan cannot be made available to the public (projects can be shared publicly on the Enterprise plan). However, links to the individual chats can be shared publicly. A sample of chats are shared below in the LLM prompt links section.

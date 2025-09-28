@@ -2,7 +2,7 @@
 body {
   text-align: justify;
 }
- 
+
 .quarto-title-block,
 .quarto-figure,
 .quarto-table,
@@ -10,8 +10,8 @@ body {
   margin-left: auto;
   margin-right: auto;
 }
- 
-img, table {
+
+img, table, .quarto-table {
   display: block;
   margin-left: auto;
   margin-right: auto;
@@ -31,4 +31,52 @@ div.quarto-figure figcaption {
   text-align: center !important;
 }
 
- 
+/* Additional specificity for table captions in various contexts */
+.cell-output-display caption,
+.quarto-layout-panel caption,
+div[class*="tbl-"] caption,
+caption {
+  text-align: center !important;
+  caption-side: bottom !important; /*  Moves caption below table */
+}
+
+/* Table centering and sizing */
+.quarto-table {
+  display: table;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.quarto-table table {
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content; /*  Keeps narrow tables centered */
+}
+
+.quarto-table caption {
+  text-align: center !important;
+  caption-side: bottom !important;
+}
+
+/* Optional: soften or remove horizontal rules */
+hr {
+  display: none; /*  Removes unwanted lines before/after tables */
+}
+
+.centered-table {
+  display: table;
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+}
+
+.centered-table table {
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+}
+
+.centered-table caption {
+  text-align: center !important;
+  caption-side: bottom !important;
+}
