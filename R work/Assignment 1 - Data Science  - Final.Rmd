@@ -11,6 +11,33 @@ The section below loads the data.
 
 # Scottish Avalanche Hazard Prediction using Enhanced Neural Networks
 
+# Install CRAN packages
+install.packages(c(
+  "tidyverse",
+  "glmnet",
+  "VIM",
+  "corrplot",
+  "caret",
+  "ROSE",
+  "randomForest",
+  "xgboost",
+  "knitr",
+  "kableExtra",
+  "gridExtra",
+  "ggplot2",
+  "scales",
+  "lubridate",
+  "irr",
+  "MLmetrics"
+))
+
+# Install keras3 and tensorflow from RStudio's reticulate ecosystem
+install.packages("keras3")
+install.packages("tensorflow")
+```
+
+
+```{r}                 
 # Load required libraries
 library(tidyverse)
 library(keras3)
@@ -30,6 +57,9 @@ library(scales)
 library(lubridate)
 library(irr)
 library(MLmetrics)
+```
+
+```{r}
 
 # Check if corrplot is available, if not, skip correlation plot
 corrplot_available <- requireNamespace("corrplot", quietly = TRUE)
@@ -40,7 +70,7 @@ set.seed(42)
 # DATA LOADING AND INITIAL EXPLORATION
 # Assuming the marker has the dataset loaded in the source directory
 # Load the dataset
-data <- read.csv("C:/Users/brend/OneDrive/UCT/STAT5073Z - Data Science for Industry/Group Assignment/R work/scotland_avalanche_forecasts_2009_2025.csv", stringsAsFactors = FALSE)
+data <- read.csv("scotland_avalanche_forecasts_2009_2025.csv", stringsAsFactors = FALSE)
 ```
 
 The section below covers exploratory data analysis (EDA) and primarily focuses
@@ -76,8 +106,8 @@ categorical_vars <- data_structure$Variable[data_structure$Type %in% c("characte
 data_structure$Variable_Type <- ifelse(data_structure$Variable %in% numeric_vars, "Numeric", "Categorical")
 
 cat("Data Structure Summary:\n")
-print(kable(data_structure, caption = "Dataset Structure Overview") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+kable(data_structure, caption = "Dataset Structure Overview") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
 cat(sprintf("\nVariable Type Distribution:\n"))
 cat(sprintf("- Numeric variables: %d\n", length(numeric_vars)))
@@ -108,8 +138,8 @@ if(length(numeric_vars) > 0) {
     separate(Metric, into = c("Variable", "Statistic"), sep = "_") %>%
     spread(key = "Statistic", value = "Value")
   
-  print(kable(numeric_summary, caption = "Summary Statistics for Numeric Variables") %>%
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+  kable(numeric_summary, caption = "Summary Statistics for Numeric Variables") %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 }
 
 ```
@@ -156,8 +186,8 @@ fah_summary <- data.frame(
 )
 
 cat("FAH Distribution:\n")
-print(kable(fah_summary, caption = "Forecast Avalanche Hazard (FAH) Distribution") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+kable(fah_summary, caption = "Forecast Avalanche Hazard (FAH) Distribution") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
 # Missing FAH analysis
 fah_missing <- sum(is.na(data$FAH) | data$FAH == "" | data$FAH == "NA")
@@ -219,8 +249,8 @@ missing_summary <- data_structure %>%
   arrange(desc(Missing_Pct))
 
 cat("Missing Data by Variable:\n")
-print(kable(missing_summary, caption = "Missing Data Analysis by Variable") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+kable(missing_summary, caption = "Missing Data Analysis by Variable") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
 # Threshold analysis
 high_missing_vars <- missing_summary$Variable[missing_summary$Missing_Pct > 20]
@@ -288,8 +318,8 @@ if("Area" %in% colnames(data)) {
     arrange(desc(Count))
   
   cat("Observations by Forecasting Area:\n")
-  print(kable(area_summary, caption = "Distribution of Observations by Area") %>%
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+  kable(area_summary, caption = "Distribution of Observations by Area") %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
   
   # Geographic spread analysis
   if(all(c("latitude", "longitude") %in% colnames(data))) {
@@ -309,8 +339,8 @@ if("Area" %in% colnames(data)) {
       arrange(desc(Observations))
     
     cat("\nGeographic Spread by Area:\n")
-    print(kable(geo_summary, caption = "Geographic Coverage by Forecasting Area") %>%
-      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    kable(geo_summary, caption = "Geographic Coverage by Forecasting Area") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
   }
   
   # Area visualization
@@ -380,8 +410,8 @@ if("Date" %in% colnames(data)) {
     )
     
     cat("\nObservations by Year:\n")
-    print(kable(yearly_summary, caption = "Annual Distribution of Observations") %>%
-      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    kable(yearly_summary, caption = "Annual Distribution of Observations") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
     
     # Monthly distribution
     data_with_dates$Month <- month(data_with_dates$Date)
@@ -396,8 +426,8 @@ if("Date" %in% colnames(data)) {
     )
     
     cat("\nObservations by Month:\n")
-    print(kable(monthly_summary, caption = "Monthly Distribution of Observations") %>%
-      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    kable(monthly_summary, caption = "Monthly Distribution of Observations") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
     
     # Temporal visualizations
     par(mfrow = c(2, 2), mar = c(8, 4, 3, 2))
@@ -507,8 +537,8 @@ if(all(c("OAH", "FAH") %in% colnames(data))) {
       arrange(desc(Count))
     
     cat("\nForecast Accuracy by Risk Level:\n")
-    print(kable(accuracy_by_level, caption = "Forecast Accuracy by FAH Level") %>%
-      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    kable(accuracy_by_level, caption = "Forecast Accuracy by FAH Level") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
     
     # Visualization
     par(mfrow = c(1, 2), mar = c(8, 4, 3, 2))
@@ -572,15 +602,15 @@ if(length(numeric_vars) > 1) {
     high_cor_df <- high_cor_df[order(abs(high_cor_df$Correlation), decreasing = TRUE), ]
     
     cat("Highly Correlated Variable Pairs (|r| > 0.7):\n")
-    print(kable(high_cor_df, caption = "Highly Correlated Variable Pairs") %>%
-      kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+    kable(high_cor_df, caption = "Highly Correlated Variable Pairs") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
     
     # Multicollinearity assessment
     very_high_cor <- high_cor_df[abs(high_cor_df$Correlation) > 0.9, ]
     if(nrow(very_high_cor) > 0) {
       cat("\nPotential Multicollinearity Issues (|r| > 0.9):\n")
-      print(kable(very_high_cor, caption = "Variables with Potential Multicollinearity") %>%
-        kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+      kable(very_high_cor, caption = "Variables with Potential Multicollinearity") %>%
+        kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
     }
   } else {
     cat("No highly correlated variable pairs found (|r| > 0.7)\n")
@@ -675,8 +705,8 @@ for(var in numeric_vars) {
 outlier_summary <- outlier_summary[order(outlier_summary$Outlier_Pct, decreasing = TRUE), ]
 
 cat("Outlier Analysis Summary:\n")
-print(kable(outlier_summary, caption = "Outlier Detection Results (IQR Method)") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+kable(outlier_summary, caption = "Outlier Detection Results (IQR Method)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
 # Identify variables with high outlier rates
 high_outlier_vars <- outlier_summary$Variable[outlier_summary$Outlier_Pct > 5]
@@ -2118,9 +2148,9 @@ ordinal_summary <- data.frame(
   stringsAsFactors = FALSE
 )
 
-print(kable(ordinal_summary, digits = 4, 
+kable(ordinal_summary, digits = 4, 
            caption = "Comprehensive Ordinal Classification Metrics") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")))
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
 # 18. Risk assessment specific metrics for avalanche prediction
 cat("\n=== AVALANCHE-SPECIFIC RISK ASSESSMENT METRICS ===\n")
@@ -2208,4 +2238,3 @@ gc()
 cat("\n=== MODEL TRAINING AND EVALUATION COMPLETE ===\n")
 
 ```
-
