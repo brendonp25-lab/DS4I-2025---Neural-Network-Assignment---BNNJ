@@ -294,7 +294,7 @@ To improve performance, future work should focus on better representation of hig
 ## Author Contributions
 - Brendon Pretorius: Formal Analysis, Project Administration, Writing – Review & Editing
 - Johan John: Formal Analysis, Writing – Original Draft Preparation
-- Nabil Patel: Formal Analysis, Methodology
+- Nabil Patel: Formal Analysis, Methodology, Writing – Original Draft Preparation
 - Nkateko Mawelele: Formal Analysis, Writing – Original Draft Preparation  
 
 ## References (APA)
