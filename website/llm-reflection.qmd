@@ -7,11 +7,11 @@ format:
 ---
 
 ## AI Statement
-Our group extensively utilized multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI and Grok by xAI. All interactions were documented and archived in a dedicated Claude project for complete traceability*.
+Our group extensively used multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI and Grok (Grok 4) by xAI. All interactions were documented and archived in a dedicated Claude project for complete traceability*.
 
-* Claude projects on the Claude Pro plan cannot be made available to the public (projects can be shared publicly on the Enterprise plan). However, links to the individual chats can be shared publicly. A sample of chat are shared below in Appendix A.
+[^1]: Claude projects on the Claude Pro plan cannot be made available to the public (projects can be shared publicly on the Enterprise plan). However, links to the individual chats can be shared publicly. A sample of chats are shared below in the LLM prompt links section.
 
-## Phases of AI Utilization
+## Phases of AI Utilisation
 AI tools supported key stages of our data science workflow:
 
 - **Exploratory Data Analysis (EDA)**: Assisted in identifying trends and patterns in the Scotland avalanche forecasts dataset.
@@ -19,14 +19,16 @@ AI tools supported key stages of our data science workflow:
 - **Code Development**: Generated comprehensive R code using keras3 and TensorFlow, based on our EDA findings and requirements. Key prompts covered outlier assessment, missing value strategies, model architecture (including Random Forest feature selection and hyperparameter tuning via grid search), and data splitting (e.g., adjusting from 80/10/10 to 70/15/10 ratios). Also aided debugging, such as transitioning from manual upsampling to ROSE techniques.
 - **Report Writing and Review**: Helped draft analysis sections, interpret evaluation metrics, and perform proofreading, spell-checking, and grammar verification.
 
-We maintained critical oversight: All AI-generated content was verified against avalanche forecasting literature and Scottish meteorological standards, with code tested for functionality in our dataset context.
+We maintained critical oversight over the AI deliverables. All AI-generated content was verified against avalanche forecasting literature and Scottish meteorological standards, with code tested for functionality in our dataset context. 
 
 ## Benefits and Verification
-AI integration offered substantial advantages:
+AI integration offered our group substantial advantages, including: 
+
 - Accelerated timelines and exposure to advanced techniques.
 - Comprehensive code documentation and creative problem-solving.
 
-Accuracy was verified through:
+Accuracy was verified through: 
+
 - Cross-referencing with peer-reviewed research.
 - Systematic code testing and manual spot-checks.
 - Comparing outputs across tools for inconsistencies.
@@ -61,12 +63,11 @@ Ultimately, AI serves as a powerful assistant but cannot replace human critical 
 ### Chats from Grok
 
 [EDA and initial Model Development](https://x.com/i/grok/share/bO0WtyhgHe3Lwxdk7bLfX5f3c)
-
+ 
 [Model Refinement](https://x.com/i/grok/share/6w5tC2QlUN4ByqzjyQT9wQ0R4)
-
+ 
 [Model Debugging](https://x.com/i/grok/share/Eh2o6rqigg66NEN8JBh9D2GnD)
-
+ 
 [Markdown format & Webpage hosting](https://x.com/i/grok/share/bW0AYWkA3lrg2qNgfTDezi2fS)
-
 
 ### Chats from ChatGPT
