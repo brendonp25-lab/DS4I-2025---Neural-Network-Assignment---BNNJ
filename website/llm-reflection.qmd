@@ -7,9 +7,7 @@ format:
 ---
 
 ## AI Statement
-Our group extensively used multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI and Grok (Grok 4) by xAI. All interactions were documented and archived in a dedicated Claude project for complete traceability*.
-
-[^1]: Claude projects on the Claude Pro plan cannot be made available to the public (projects can be shared publicly on the Enterprise plan). However, links to the individual chats can be shared publicly. A sample of chats are shared below in the LLM prompt links section.
+Our group extensively used multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI and Grok (Grok 4) by xAI. All interactions were documented and archived in a dedicated Claude project for complete traceability[^1].
 
 ## Phases of AI Utilisation
 AI tools supported key stages of our data science workflow:
@@ -71,3 +69,6 @@ Ultimately, AI serves as a powerful assistant but cannot replace human critical 
 [Markdown format & Webpage hosting](https://x.com/i/grok/share/bW0AYWkA3lrg2qNgfTDezi2fS)
 
 ### Chats from ChatGPT
+
+
+[^1]: Claude projects on the Claude Pro plan cannot be made available to the public (projects can be shared publicly on the Enterprise plan). However, links to the individual chats can be shared publicly. A sample of chats are shared below in the LLM prompt links section.
