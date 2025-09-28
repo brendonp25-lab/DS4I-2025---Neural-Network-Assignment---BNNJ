@@ -7,7 +7,9 @@ format:
 ---
 
 ## AI Statement
-Our group extensively utilized multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI, Grok by xAI, and Gemini by Google. All interactions were documented and archived in a dedicated Claude project for complete traceability.
+Our group extensively utilized multiple artificial intelligence tools throughout this avalanche prediction neural network project, employing a systematic and transparent approach to AI integration. The tools included Claude (Sonnet and Opus versions) by Anthropic, ChatGPT-5 by OpenAI, Grok by xAI, and Gemini by Google. All interactions were documented and archived in a dedicated Claude project for complete traceability*.
+
+* Claude projects on the Claude Pro plan cannot be made available to the public (projects can be shared publicly on the Enterprise plan). However, links to the individual chats can be shared publicly. A sample of chat are shared below in Appendix A.
 
 ## Phases of AI Utilization
 AI tools supported key stages of our data science workflow:
@@ -39,3 +41,15 @@ AI tools demonstrated significant strengths but also limitations:
 Ultimately, AI serves as a powerful assistant but cannot replace human critical thinking, domain expertise, or methodological rigor. This project highlighted the importance of thoughtful, transparent AI use to amplify capabilities while maintaining control.
 
 ## LLM prompt links
+
+### Chats from Claude
+
+[sample] (https://claude.ai/share/c0e2308c-8205-446e-8800-1881a645b3a3)
+[sample] (https://claude.ai/share/bffd6c29-b1d2-4082-a885-654aeacac45b)
+[sample] (https://claude.ai/share/b2a6d389-a55e-4628-a36c-753060f37a27)
+[sample] (https://claude.ai/share/b547e6dc-3399-4ca1-b35c-5c4da2cbac81)
+[sample] (https://claude.ai/share/8e3a9f15-d074-483f-8576-88a426b1ecf5)
+
+### Chats from Grok
+
+### Chats from ChatGPT
