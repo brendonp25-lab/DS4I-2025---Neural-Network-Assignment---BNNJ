@@ -9,9 +9,6 @@ Welcome to our Avalanche Hazard Prediction project.
 - [Scientific Paper](paper.html)  
 - [LLM Reflection](llm-reflection.html)  
 - [Appendix](appendix.html)  
-
-images/snow-avalanche.jpg
-:fig-align: center
-:width: 100%
-Avalanche Hazard Visualization.  
+ 
+![Avalanche Hazard Visualization](images/snow-avalanche.jpg){fig-align="center" width="100%"}
 Source: [wallpapers.com](https://wallpapers.com/images/hd/snow-avalanche-slope-c47otzy245cyegah.jpg)
