@@ -2,45 +2,25 @@
 title: "Scientific Paper: Neural Network for Forecasted Avalanche Hazard"
 author:
   - name: Brendon Pretorius
-  - name: Johan John
+    id: PRTBRE007
   - name: Nabil Patel
-  - name: Nkateko Nakkie Mawelele
+    id: PTLNAB006
+  - name: Nkateko Mawelele
+    id: MWLNKA001
+  - name: Johan John
+    id: JHNJOH010
 
 date: "September 27, 2025"
 embed-resources: true
 format: 
   html:
     theme: sais-theme.scss
+    css: styles.css
+    toc: true
+    toc-depth: 3
+    toc-location: body
+    toc-title: "Table of Contents"
 ---
-
-# Table of Contents
-
-- [Introduction](#introduction)
-- [Background](#background)
-- [Dataset](#dataset)
-- [Methodology](#methodology)
-- [EDA](#eda)
-  - [Target Variable Distribution](#target-variable-distribution)
-  - [Missing Data Analysis](#missing-data-analysis)
-  - [Temporal Analysis](#temporal-analysis)
-- [Data Processing](#data-processing)
-  - [Outlier Detection](#subsection-outlier-detection)
-  - [Feature Engineering](#subsection-feature-engineering)
-  - [Imputation for Missing Values](#imputation-for-missing-values)
-  - [Target Encoding](#target-encoding)
-  - [Feature Selection](#feature-selection)
-- [Implementation](#implementation)
-  - [Data Splitting and ROSE Balancing](#data-splitting-and-rose-balancing)
-  - [Neural Network Architecture](#neural-network-architecture)
-- [Model Performance Evaluation](#model-performance-evaluation)
-  - [Overall Performance](#overall-performance)
-  - [Confusion Matrix and Class-Level Performance](#confusion-matrix-and-class-level-performance)
-  - [Confidence-Based Reliability](#confidence-based-reliability)
-  - [Avalanche-Specific Safety Metrics](#avalanche-specific-safety-metrics)
-- [Feature Importance Assessment](#feature-importance-assessment)
-- [Conclusion and Recommendations](#conclusion-and-recommendations)
-- [Author Contributions](#author-contributions)
-- [References (APA)](#references-apa)
 
 
 ## Introduction
@@ -61,163 +41,140 @@ Avalanche forecasting looks to improving consistency, calibration, and timelines
 
 The dataset is an operational archive produced by the Scottish Avalanche Information Service (SAIS). It spans approximately fifteen winter seasons and reflects real-time fieldwork. Forecasters collect these records in severe weather environments and under time constraints. As a result, the data shows uneven sampling across storm cycles and regions, along with missing entries during periods of limited access.
 
-The variables in the dataset include physically informed features from the environment. They are grouped into categories below. A complete list of all variables, including their descriptions, data types, and basic statistics, is provided in the [Appendix](appendix.html).
+The feature set can be categorised into five distinct groups that collectively capture the multifaceted nature of avalanche risk assessment:
 
-### Terrain Susceptibility (Incline, Aspect, Alt)
-Slope angle is the primary release control for slab avalanches, as most events initiate between the mid-30s and mid-40s degrees. Thus, Incline serves as a direct indicator of where failures are most likely. Aspect determines how much wind and sun a slope receives; when analyzed with recent Wind.Dir, it identifies lee (wind-loaded) and windward slopes. Alt specifies the altitude of the observation site in meters above sea level ([McClung & Schaerer, 2006](#ref-mcclung-2006); [Schweizer, Jamieson, & Schneebeli, 2003](#ref-schweizer-2003)).
+**Spatial and Temporal Features** include Date, Area, longitude, latitude, and altitude, which establish the geographical and temporal context of each observation. These variables are crucial for understanding regional variations in avalanche conditions and seasonal patterns across Scotland's diverse mountain terrain.
 
-### Loading and Weather Drivers (Air.Temp, Wind.Dir, Wind.Speed, Cloud, Precip.Code, Drift, Rain.at.900, Summit)
-Near-surface Air.Temp highlights warm spells that weaken snow bonds. Wind.Dir and Wind.Speed together govern snow transport, building slabs quickly on lee and cross-loaded slopes. Cloud cover influences cooling and heating, driving near-surface faceting or slowing refreezing. Precip.Code indicates the type and intensity of new loading (e.g., snow or showers). Rain.at.900 flags rainfall at 900m altitude, which affects snowmelt. Field Drift observations confirm recent snow blowing. Summit.* variables describe conditions at the summit, where most loading begins ([EAWS, n.d.](#ref-eaws-nd); [McClung & Schaerer, 2006](#ref-mcclung-2006); [Schweizer et al., 2003](#ref-schweizer-2003)).
+**Topographical Features** encompass Aspect and Incline, which directly influence avalanche susceptibility. Slope angle determines the gravitational stress on the snowpack, while aspect affects wind loading, solar exposure, and temperature variations that influence snow stability.
 
-### Snowpack structure and stability proxies (Total.Snow.Depth, Foot.Pen, Ski.Pen, Max.Temp.Grad, Max.Hardness.Grad, Snow.Temp, Wetness, Crystals, Snow.Index, No.Settle, AV.Cat, Insolation)
+**Meteorological Features** comprise a comprehensive set of weather observations including air temperature, wind direction and speed (both at observation level and summit), cloud cover, precipitation codes, and insolation. These variables capture the atmospheric conditions that drive snow accumulation, redistribution, and metamorphism processes fundamental to avalanche formation.
 
-Total.Snow.Depth reflects total depth of snow cover at the observation site, while Foot.Pen/Ski.Pen indicate near-surface strength. Max.Temp.Grad signals the temperature across the snowpack indicating instability. Max.Hardness.Grad captures hardness within the snowpack reflecting the layer differences. Snow.Temp defines the temperature within the snowpack and Wetness defines the degree of snow wetness. Crystals identify type or size of snow crystals observed which influences avalanche risk. Snow.Index provides cues on the stability of the snow. AV.Cat classifies avalanches by type/severity. Insolation measures the impact of solar radiation affecting snow melt. ([EAWS, n.d.](#ref-eaws-nd); [Schweizer et al., 2003](#ref-schweizer-2003); [McClung & Schaerer, 2006](#ref-mcclung-2006)).
+**Snowpack Physical Properties** include total snow depth, foot and ski penetration measurements, snow temperature, crystal characteristics, wetness levels, and drift indicators. These features provide direct measures of snowpack structure, density, and mechanical properties that determine stability and failure potential.
+
+**Snowpack Stability Indicators** encompass specialised measurements such as temperature and hardness gradients, settlement patterns, and composite indices like Snow.Index and AV.Cat. These derived metrics capture the complex internal structure and stress distribution within the snowpack that directly relate to avalanche hazard assessment [@anthropic2024claude].
 
 By relating these predictors to FAH the model can learn recurrent, non-linear patterns. It highlights situations where higher hazard is more likely, so forecasters can focus their checks and make cleaner day-to-day calls ([EAWS, n.d.](#ref-eaws-nd); [SAIS, n.d.](#ref-sais-nd)).
 
 ## Methodology
 
-This research builds a supervised, ordinal-aware classification pipeline to predict next-day Forecast Avalanche Hazard (FAH) from the operational SAIS records. The end-to-end workflow was implemented in R and organized into clearly defined stages—data auditing, preprocessing, feature engineering, imputation, encoding, feature selection, data splitting and class rebalancing, neural-network modeling, and evaluation. Reproducibility is enforced via set.seed(42) and some of the core libraries include tidyverse for data wrangling, caret for preprocessing/splitting, glmnet/randomForest for feature selection signals, ROSE for class balancing, and keras3/tensorflow for model training.
+This solution developed a supervised neural network classifier to predict next-day FAH using 16 years of SAIS operational data. The methodology followed a systematic machine learning pipeline implemented in R with reproducibility ensured through fixed random seeds.
 
-We used large language models (LLMs) to accelerate routine coding tasks. Each team member supplied an LLM with a structured brief (data schema, variable descriptions, target definition, leakage constraints, evaluation metrics) to draft boilerplate R code for preprocessing, imputation functions, model scaffolding (keras3), and plotting. To promote diversity of ideas and reduce single-model bias, different teammates intentionally used different LLMs. This use of LLMs sped up drafting, but final code, methodological choices, and validation remained human-curated.
+The dataset underwent comprehensive exploratory data analysis to assess missing data patterns, outlier distributions, and class imbalances. Non-predictive variables (observed avalanche hazard, observer identifiers, and location codes) were removed to prevent data leakage. Observations with missing target values were excluded, and FAH categories were standardized into five ordinal risk levels: Low, Moderate, Considerable-, Considerable+, and High. Statistical outlier detection using the interquartile range method combined with domain-specific constraints removed physically implausible values while preserving legitimate extreme weather events.
 
-## EDA
+New meteorologically meaningful variables were created, including wind chill indices, temperature gradients, snow-altitude interactions, and trigonometric aspect transformations. Temporal features (month, day of year, season) captured seasonal avalanche patterns. A multi-method feature selection approach combined LASSO regularisation, Random Forest importance scoring, and correlation analysis to identify the 25 most predictive variables using weighted composite scores.
+
+The dataset was split into training (70%), validation (15%), and test (15%) sets using stratified sampling to maintain class proportions. To address severe class imbalance (original ratio 7.2:1), the Random Over-Sampling Examples (ROSE) technique was applied exclusively to training data using a one-versus-rest strategy, reducing imbalance to approximately 1.2:1 while preserving natural distributions in evaluation sets.
+
+A three-layer deep neural network was implemented using Keras/TensorFlow with progressive layer sizes (256→128→64 neurons), batch normalization for training stability, and dropout regularization (rates: 0.3, 0.4, 0.5) to prevent overfitting. The model employed categorical crossentropy loss with Adam optimization and incorporated Gaussian noise injection for additional regularisation. Hyperparameter tuning evaluated three configurations, selecting the optimal based on validation accuracy.
+
+The final model was trained for up to 150 epochs with early stopping and learning rate reduction callbacks. Evaluation employed both standard multiclass metrics (accuracy, precision, recall, F1-score) and ordinal-specific measures including adjacent accuracy (±1 level), mean absolute error, and safety-critical metrics such as conservative bias and critical miss rates. This comprehensive evaluation framework assessed both predictive performance and operational safety implications for avalanche forecasting.
+
+We used large language models (LLMs) to accelerate routine coding tasks. Each team member supplied an LLM with a structured brief (data schema, variable descriptions, target definition, leakage constraints, evaluation metrics) to draft boilerplate R code for preprocessing, imputation functions, model scaffolding (keras3), and plotting. To promote diversity of ideas and reduce single-model bias, different teammates intentionally used different LLMs. This use of LLMs sped up drafting, but final code, methodological choices, and validation remained human-curated. Our detailed statement on the use of generative artifical intelligence (AI) is included in [LLM Usage and Reflection](llm-reflection.html). In the next section, we initiated exploratory data analysis (EDA) before developing our model. 
+
+## Exploratory Data Analysis
+
+This section of the report examines the key characteristics of the Scottish avalanche forecast dataset to inform modeling decisions and identify potential challenges. In particular, it investigates the distribution and balance of the target variable (FAH), assesses missing data patterns across all variables to guide preprocessing strategies, and explores temporal coverage to understand seasonal patterns and data collection consistency. 
 
 ### Target Variable Distribution
 
-::: {#fig-target-bar}
-![Bar chart showing the distribution of the FAH target variable](../R work/Graphs/fig1.jpg)
+This section examines the distribution of our target variable (FAH) to understand class balance and identify potential modeling challenges that arise from the natural rarity of high-risk avalanche conditions.
 
-Bar chart of FAH distribution
-:::
+![FAH Distribution](../R work/Graphs/fig2.jpg){#fig-target-pie fig-cap="Pie chart of FAH distribution"}
 
-::: {#fig-target-pie}
-![Pie chart showing the percentage distribution of the FAH target variable](../R work/Graphs/fig2.jpg)
-
-Pie chart of FAH distribution
-:::
-
-From @fig-target-bar and @fig-target-pie, we observe that the FAH target variable exhibits severe class imbalance, with safer classes dominating the distribution: Low (≈32.5%) and Moderate (≈30.7%) together account for ≈63% of observations, while Considerable- is moderately represented (≈23.6%). In contrast, the higher-risk classes—Considerable+ (≈8.8%) and especially High (≈4.4%)—are rare. This skew implies that a model could achieve high overall accuracy by favoring common classes while failing to detect infrequent but critical high-hazard events. To mitigate this, we employ ROSE balancing during training and prioritize macro-averaged metrics alongside high-risk class recall in evaluation.
+From @fig-target-pie, we observe that the FAH target variable exhibits severe class imbalance, with safer classes dominating the distribution: Low and Moderate together account for approximately 63% of observations, while Considerable- is moderately represented at 23.6%. In contrast, the higher-risk classes i.e., Considerable+ and especially High are rare. This skew implies that a model could achieve high overall accuracy by favoring common classes i.e., naive classification, while failing to detect infrequent but critical high-hazard events. To mitigate this, we later employ ROSE balancing.
 
 ### Missing Data Analysis
 
-::: {#fig-missing-data}
-![Graph showing missing data diagnostics across variables](../R work/Graphs/fig3.jpg)
+This section assesses missing data patterns across all variables to identify problematic predictors and inform data quality decisions for preprocessing.
 
-Missing data analysis graph
-:::
+![Missing data analysis graph](../R work/Graphs/fig3.jpg){#fig-missing-data fig-cap="Missing data analysis"}
 
-From @fig-missing-data, the missing data diagnostics reveal that AV_Cat and Ski_Pen exhibit the highest gaps (≈20%+), prompting their removal from the dataset during preprocessing. Following these, a cluster of snowpack microstructure and condition variables (e.g., Crystals, Wetness, No_Settle) show moderate missingness, alongside certain wind-direction and temperature fields. The target variable FAH has negligible missingness, likely due to operational teams making inferences when weather conditions do not allow for some metrics to be captured.
+From @fig-missing-data, the missing data diagnostics reveal that **AV_Cat** and **Ski_Pen** exhibit the highest gaps (≈20%+), prompting their removal from the dataset during preprocessing. Following these, a cluster of snowpack microstructure and condition variables (e.g., Crystals, Wetness, No Settle) show moderate missingness, alongside certain wind-direction and temperature fields. Therefore, we implemented data imputation techniques to account for the missing data in these features. The target variable FAH has negligible missingness; however, we removed observations with missing data in the target variable.
+
+### Data Quality Issues & Outliers
+
+Our outlier analysis during EDA revealed significant data quality issues across multiple features. Altitude measurements contained two extreme outliers (244,859m and 77,044m) that were physically impossible given Scotland's topography, where the highest peak reaches only 1,345m. Aspect measurements included values exceeding 163,770 degrees, far beyond the valid compass range of 0-360 degrees. Wind speed data exhibited a broad range from negative values to 290 km/h, with summit wind speeds reaching up to 360 km/h—values that likely represent measurement errors rather than genuine hurricane-force conditions in Scottish mountains. Snow depth measurements displayed extreme variability, ranging from negative values to an implausible maximum of 3,000cm (30 metres), significantly exceeding typical Scottish mountain snow accumulation patterns. Cloud cover data contained impossible values, including negative percentages and readings up to 199%, exceeding the theoretical maximum of 100%. Both foot and ski penetration measurements included negative values, with foot penetration ranging up to 300cm and ski penetration reaching 55cm. Incline data spanned from negative values to 1,020 degrees, with numerous observations exceeding 90 degrees. Extreme values were addressed through a combination of IQR-based removal for most variables and domain-specific thresholds for others, with negative values corrected to zero and upper limits applied based on physical plausibility within the Scottish mountain context.
 
 ### Temporal Analysis
 
-::: {#fig-temporal-coverage}
-![Group of graphs showing temporal coverage and seasonal patterns](../R work/Graphs/fig4.jpg)
+This section examines the temporal distribution of observations to understand seasonal patterns, data collection consistency, and potential time-based features for modeling.
 
-Temporal analysis graphs
-:::
+![Temporal analysis graphs](../R work/Graphs/fig4.jpg){#fig-temporal-coverage fig-cap="Temporal analysis"}
 
-From @fig-temporal-coverage that denotes temporal coverage we can see that the archive spans many winters with stable annual volumes after the early years and a strong seasonal concentration in Dec–Mar, tapering in shoulder months and near-zero in summer (as expected). The daily series shows a burst of entries followed by lulls which tell us that data arrives in clusters during winter storm cycles and thin out outside winter. These patterns justify including month/season features and caution against assuming stationarity across years.
+From @fig-temporal-coverage, it can be observed that the dataset spans from 2009 to 2025, providing 16 years of avalanche forecasting data with remarkable consistency. The monthly distribution reveals the expected strong seasonal concentration, with the vast majority of observations occurring during winter months (December through March).  Summer months (May through November) show minimal or zero activity, which aligns perfectly with avalanche season expectations in Scottish mountains where snow conditions are primarily a winter phenomenon. These temporal patterns supported the inclusion of seasonal and monthly features in our neural network model, as demonstrated in the feature engineering section [Feature Engineering](#sec-feature-engineering). 
 
-::: {#fig-fah-oah}
-![Graph comparing FAH versus OAH pairs](../R work/Graphs/fig5.jpg)
+### Comparison of Actual and Predicted Observations
 
-FAH vs OAH comparison graph
-:::
+This section evaluates the relationship between forecast and observed avalanche hazard levels to establish baseline performance expectations and identify inherent prediction challenges.
 
-From @fig-fah-oah, which analyses FAH versus OAH pairs as a verification benchmark for forecast reliability, we observe an overall accuracy of approximately 70–75%. Per-class performance varies notably: accuracy is highest for Low risk (mid-90s%), followed by Moderate (70%), then decreases for Considerable- (60–70%), drops substantially for Considerable+ (35%), and improves slightly for High (~45%). This pattern suggests that forecasters—and by extension, predictive models—struggle most with distinguishing adjacent hazard boundaries. Accordingly, our model evaluation emphasizes ordinal metrics such as adjacent accuracy (±1 level), critical-miss rate (underpredicting high risk), and high-risk sensitivity to ensure practical utility in avalanche forecasting.
+![Graph comparing FAH versus OAH pairs](../R work/Graphs/fig5.jpg){#fig-fah-oah fig-cap="Graph comparing FAH versus OAH pairs"}
 
-The EDA completed paints a clear operational picture with our target strongly skewed toward Low/Moderate days, so hence a model judged on plain accuracy could look good while failing on the rare but consequential upper hazards. In the implementation, we therefore look to rebalance the training split with ROSE and commit to macro metrics and high-risk recall at evaluation. The missingness is structured and not entirely random, primarily with the >20% gaps in **AV.Cat** and **Ski.Pen** which we drop. The clusters in snowpack detail fields and some wind directions reinforce the choice of **Area×Season** imputation (fit on train only) and the inclusion of seasonal features. The temporal profile confirms winter-centric usage with stable annual volumes, motivating Month/Season encodings and caution about year-to-year drift. Finally, FAH–OAH verification (~70–75% overall, strongest on Low, weakest in the Considerable+/High tail) mirrors the hardest real-world boundaries, hence we will look to prioritize adjacent accuracy (±1), critical-miss rate, and high-risk sensitivity to ensure the model not only performs well on average but reliably catches dangerous days.
+From @fig-fah-oah, which analyses FAH versus OAH pairs as a verification benchmark for forecast reliability, we observe an overall accuracy of approximately 70–75%. Per-class performance varies notably: accuracy is highest for Low risk (mid-90s%), followed by Moderate (70%), then decreases for Considerable- (60–70%), drops substantially for Considerable+ (35%), and improves slightly for High (~45%). This pattern suggests that forecasters—and by extension, predictive models—struggle most with distinguishing adjacent hazard boundaries. Accordingly, our model evaluation emphasises ordinal metrics such as adjacent accuracy (±1 level), critical-miss rate (underpredicting high risk), and high-risk sensitivity to ensure practical utility in avalanche forecasting.
 
-## Data Processing
+### Correlation analysis
 
-After initial data cleaning, we removed non-predictive fields (OAH, Obs) and filtered out the 1% of rows with missing FAH which left us  with 10,562 usable records.The FAH values were standardized into five clean categories with the following counts: Low 3,433, Moderate 3,239, Considerable− 2,498, Considerable+ 933, High 459 this was confirming a strong skew toward safer days. 
+This section evaluates the correlations between the features as well as the correlations between the features and the output.
 
-A missingness audit showed two variables with >20% gaps—AV.Cat (23.4%) and Ski.Pen (22.5%) these we then dropped to avoid heavy, low-confidence imputation. The next tier of missingness is moderate and structured rather than random. Core near-surface weather and geometry variables have very low gaps (≤1–3%). These patterns motivate our Area×Season imputation (fit on the training split only).
+![Correlation heatmap](../R work/Graphs/fig6.jpg){#fig-correlation-heatmap fig-cap="Correlation heatmap"}
 
-### Outlier Detection
+The correlation heatmap in @fig-correlation-heatmap reveals coherent but mostly moderate correlation clusters among variables. Notably, temperature features (Air temperature, and summit air temperature) exhibit strong covariation, while cloud and insolation show the expected inverse relationship. Wind speeds correlate across levels with some directional noise, and penetration/strength metrics (Foot penetration and ski penetration depth) associate with total snow depth in predictable ways. Meanwhile, maximum temperature gradient and maximum hardness gradient relate to temperature and snow-structure variables through more complex mechanisms, likely tied to metamorphic processes in the snowpack. Overall, this indicates potential multicollinearity, particularly among thermodynamic and wind features, which could destabilise linear models and hinder neural network convergence. To address this, we implemented ensemble feature selection combining LASSO regularisation, random forest importance scoring, and correlation-based filtering to minimise redundancy.
 
-To stabilise modelling while preserving the signal, we applied a two-tier outlier process. First, we converted any string “NA”s to true NAs and used a robust IQR filter (k = 3.5) on key continuous variables, while looking to prune only extreme spikes: Alt (2), Wind.Speed (22), Summit.Wind.Speed (81), Total.Snow.Depth (111), Air.Temp (1), Summit.Air.Temp (0), and Foot.Pen (34). Second, we enforced physical plausibility rules and essentially removed Aspect > 360° (8), constrained Cloud to [0,100]% (3), and limited Incline to [0,90]° (5). In total, 267 rows (2.53%) were dropped. This keeps legitimate extremes (e.g., high winds/depths during storms) while eliminating impossible or clearly erroneous readings that would distort scaling, inflate variance, and hinder neural-network optimisation.
+### EDA Conclusion
 
-The boxplots show two kinds of outliers. Some are implausible values with AV.Cat having huge positive/negative magnitudes and >20% missingness. Cloud occasionally exceeds 100% or goes negative.  The others may be described as legitimate extremes as Snow.Index has a heavy right tail, Crystals has rare large values amid many zeros, and Rain.at.900 behaves like a binary indicator (0/1), so the “1”s only look like outliers on a numeric boxplot. Latitude spans the expected Scottish band and is not a true outlier.
+The target variable (FAH) exhibits severe class imbalance, with safer conditions (Low and Moderate) dominating approximately 63% of observations whilst higher-risk categories (Considerable+ and High) remain rare.  To address this imbalance, ROSE sampling was applied to the training data using a one-versus-rest strategy, generating synthetic samples to achieve more balanced class distributions whilst preserving natural distributions in validation and test sets. Missing data patterns reveal structured gaps rather than random missingness. Variables **AV.Cat** and **Ski.Pen** show the highest missingness rates (>20%), prompting their removal during preprocessing. Additional moderate gaps appear in snowpack microstructure variables and certain meteorological fields, leading to the implementation of imputation strategies for missing data. The temporal analysis confirms expected seasonal patterns, with observations concentrated heavily in winter months (December-March) across a consistent 16-year span from 2009-2025. This seasonal clustering directly motivated the creation of temporal features including month, day of year, and season variables, whilst the stable annual collection volumes validate the dataset's temporal consistency for model training. Forecast verification analysis comparing FAH versus OAH reveals overall accuracy of approximately 70-75%, with performance varying substantially across risk levels. Accuracy peaks for Low risk conditions (mid-90s%) but deteriorates progressively through higher-risk categories, reaching lowest levels for Considerable+ (35%). This pattern highlights the inherent difficulty in distinguishing adjacent hazard boundaries, directly informing the adoption of ordinal-specific evaluation metrics including adjacent accuracy (±1 level), critical miss rates, and high-risk sensitivity measures rather than relying solely on overall classification accuracy. The following section discusses our data refinement stategy.
 
-Guided by this, we used a two-tier outlier strategy by first applying a physical-plausibility filters to drop AV.Cat, cap Cloud to [0,100], discard Aspect > 360°, Incline <0 or >90°, and remove negative or absurd readings for wind, snow depth, and penetrations. Second, for variables where extremes are meaningful we used robust IQR trimming with a wide cutoff (k≈3–3.5) to prune only extreme spikes while preserving genuine storm extremes. We also recast Rain.at.900 as a binary feature to avoid mislabelling valid “1”s as outliers. This approach reduces measurement/error noise, stabilizes scaling and NN training.
+## Data Refinement
 
-### Feature Engineering
+The raw Scottish avalanche forecast dataset required systematic preprocessing to ensure reliable neural network training whilst preserving the meteorological and topographical signals essential for hazard prediction. Our data refinement approach balanced the competing demands of maintaining data integrity and achieving computational tractability, recognising that avalanche conditions exhibit strong spatial and temporal dependencies that must be preserved throughout the cleaning process.  The following subsections detail our systematic approach to feature removal, outlier detection, feature engineering, missing value imputation, target encoding, feature selection, and class balancing, culminating in a refined dataset of 7,530 complete observations suitable for robust neural network training and evaluation.
 
-We developed a small set of mechanism-aware features to turn raw measurements into signals the model can learn from. A Wind_Chill proxy (Air.Temp − 0.6×Wind.Speed) captures near-surface cooling that weakens bonds under strong winds. A Temp_Gradient (Summit.Air.Temp − Air.Temp) approximates vertical stability and transport potential. Snow_Alt_Interaction (Total.Snow.Depth × Alt/1000) lets snowfall load scale with elevation and the rain–snow line. Because Aspect is circular (0°≈360°), we encoded it as Aspect_North = cos(Aspect) and Aspect_East = sin(Aspect) to avoid artificial discontinuities and to align with wind-loading geometry. Finally, we added Month, Day_of_Year, and Season to reflect the strong winter seasonality seen in the EDA and to let the network learn intra-season cycles (e.g., cold spells vs. thaw pulses). Collectively, these features reduce redundancy, respect data geometry, and embed avalanche mechanics directly into the predictors.
+### Feature Removal
 
-::: {#fig-correlation-heatmap}
-![Correlation heatmap revealing relationships among variables](../R work/Graphs/fig6.jpg)
+Our preprocessing commenced with the removal of non-predictive administrative fields, specifically OAH (observed avalanche hazard) and Obs (observer identifier), since our objective focused on predicting forecasted rather than observed conditions. In addition, after the imputation section, we removed non-predictive features i.e., **Date**, **OSgrid** and **location**. 
 
-Correlation heatmap
-:::
+We eliminated 109 observations lacking FAH values, leaving 10 562 viable records. Missing data analysis exposed significant gaps in **AV.Cat** (23.4%) and **Ski.Pen** (22.5%), which we excluded to avoid unreliable imputation. The remaining variables exhibited structured rather than random missingness patterns, with core meteorological and topographical measurements showing minimal gaps (≤3%), supporting our subsequent contextual imputation approach. 
 
-The correlation heatmap in @fig-correlation-heatmap reveals coherent but mostly moderate correlation clusters among variables. Notably, temperatures (Air.Temp, Summit.Air.Temp) exhibit strong covariation, while Cloud and Insolation show the expected inverse relationship. Wind speeds correlate across levels with some directional noise, and penetration/strength metrics (Foot.Pen, Ski.Pen) associate with Total.Snow.Depth in predictable ways. Meanwhile, Max.Temp.Grad and Max.Hardness.Grad relate to temperature and snow-structure variables through more complex mechanisms, likely tied to metamorphic processes in the snowpack. Overall, this indicates potential multicollinearity, particularly among thermodynamic and wind features, which could destabilize linear models and hinder neural network convergence. To address this, we implemented ensemble feature selection combining LASSO regularization, random forest importance scoring, and correlation-based filtering to minimize redundancy.
+### Outlier Removal
 
-Leveraging these patterns, we engineered targeted features to capture key avalanche mechanics in stable, low-redundancy forms:
+Our outlier removal strategy involved a dual-tier outlier detection protocol compining statistical principles with domain expertise. Initially, we converted string representations of missing values to proper NA indicators and applied robust Interquartile Range filtering (with a swift scalar parameter of k=3.5) to meteorological variables prone to measurement errors i.e.:
+ 
+- **Alt** (2) 
+- **Wind.Speed** (22)
+- **Summit.Wind.Speed** (81) 
+- **Total.Snow.Depth** (111) 
+- **Air.Temp** (1)  
+- **Foot.Pen** (34) 
 
-- Wind–cold interaction: a simple wind-chill proxy (Air.Temp − 0.6×Wind.Speed) to reflect near-surface cooling.
+Subsequently, we enforced physical plausibility constraints, removing Aspect measurements exceeding 360 degrees (8 cases), constraining Cloud coverage to 0-100% (3 cases), and limiting Incline to physically realistic slopes between 0-90 degrees (5 cases). This conservative approach eliminated 267 observations (2.53% of the dataset) whilst preserving legitimate extreme weather events that provide crucial signal for hazard prediction. The methodology successfully removed erroneous readings that would distort feature scaling and hinder neural network optimisation, without sacrificing valuable information about genuine storm conditions.
 
-- Vertical stability: summit–valley temperature gradient (Summit.Air.Temp − Air.Temp) as a rough indicator of atmospheric stratification/transport potential
+### Feature Engineering {#sec-feature-engineering}
 
-- Snow–altitude interaction: Total.Snow.Depth × (Alt/1000) to allow depth effects to vary with elevation (rain/snow line).
-
-- Circular aspect encoding: cos(Aspect) and sin(Aspect) to preserve directionality without discontinuity at 360°/0°.
-
-- Seasonality: calendar Month, Day_of_Year, and Season factors to capture intra-winter cycles.
+We developed five engineered features that encode avalanche formation mechanisms directly into the predictor space. Wind chill, calculated as air temperature minus 0.6 times wind speed, approximates near-surface cooling effects that influence snowpack stability under windy conditions. Temperature gradient, representing the difference between summit air temperature and air temperature, captures atmospheric stability and potential for snow transport processes. Snow altitude interaction  multiplies total snow depth by altitude scaled to kilometres, reflecting elevation-dependent snow accumulation patterns and rain-snow transition zones. Recognising the circular nature of compass bearings, we transformed aspect into orthogonal components i.e., aspect north using cosine transformation and aspect east using sine transformation, eliminating artificial discontinuities at 360° and 0°. Temporal features i.e., Month, day, and season were extracted to capture the pronounced seasonal patterns evident in the EDA, enabling the network to learn both inter- and intra-seasonal risk variations.
 
 ### Imputation for Missing Values
 
-We address missing data with a context-aware, hierarchical imputation routine that mirrors how avalanche conditions vary across space and season. First, for each Area×Season group we fill numeric gaps with the group median (robust to outliers) and categorical gaps with the group mode, so replacements reflect typical conditions for that region and time of year rather than a blunt global average. Next, any leftovers are handled with global medians/modes as a conservative fallback. We explicitly exclude non-predictive and target fields (Date, OSgrid, Location, FAH) from imputation to avoid leakage into the label. This design preserves regional/seasonal structure noted in the EDA  while producing a complete feature matrix for modelling.
+Missing value imputation employed a hierarchical approach reflecting the spatial and temporal structure of avalanche conditions. We employed area and seasonal medians to impute missing values in numerical features, while categorical features were imputed using modal values.  This ensures replacement values reflect typical conditions for specific regions and seasons rather than dataset-wide averages that could misrepresent local climate patterns.
 
-### Target Encoding
+### Encoding
 
-To prepare the data for a neural network, we first removed non-predictive IDs (Date, OSgrid, Location) and encoded the target, FAH, as an ordinal integer in true risk order Low→High = 0–4. A verification table confirmed a one-to-one mapping (Low=0, Moderate=1, Considerable−=2, Considerable+=3, High=4) with no unmapped values and the encoded class counts [3398, 3167, 2412, 895, 423], matching the observed imbalance. 
-
-For predictors, we cleaned categorical fields and applied a frequency threshold (≥50) so very rare levels were folded into “Other” to limit sparsity. We then one-hot encoded the remaining categories for Area, Precip.Code, and Season, while adding binary indicator columns and dropping the original fields. This pipeline preserves the ordinal meaning of the hazard label while transforming categorical inputs into a numerically stable representation that dense neural networks can learn from, with reduced risk of overfitting to tiny categories.
+The next step in our model involved encoding encoded categorical features and the target variable. Target encoding transformed the categorical FAH variable into an ordinal integer sequence (Low=0, Moderate=1, Considerable-=2, Considerable+=3, High=4), preserving the natural risk hierarchy essential for ordinal classification evaluation. For predictors, we cleaned categorical fields and applied a frequency threshold (≥50) so very rare levels were folded into “Other” to limit sparsity. 
 
 ### Feature Selection
 
-After cleaning and encoding, we standardized all numeric predictors and ran an ensemble feature-selection procedure on the 7,530 complete cases to concentrate signal and control dimensionality. Three complementary signals were computed per feature—LASSO coefficients (linear sparsity), Random Forest permutation importance (non-linear/interaction effects), and target correlation—each normalized to 0–100 and combined with weights (RF 40%, LASSO 30%, Correlation 30%). LASSO retained 30 features, Random Forest and correlation evaluated 47 while the weighted scores yielded a final shortlist of 25 predictors. The top-ranked variables are physically coherent with avalanche mechanics are
+The model implements a comprehensive feature selection process. The process begins by separating features from the target variable and standardising numerical features using centre and scale normalisation to ensure all variables are on comparable scales. The model employs a multi-method approach that combines three different feature selection techniques to create a robust scoring framework. First, it uses LASSO regularisation with cross-validation to identify features with non-zero coefficients, scoring them based on the absolute magnitude of their coefficients. Second, it applies Random Forest to evaluate feature importance, though it limits the analysis to the top 50 most correlated features if the dataset is too large. Finally, it calculates correlation-based scores by measuring the absolute correlation between each feature and the target variable.
 
-- Foot.Pen (near-surface strength)
+The innovative aspect of this approach lies in its composite scoring system, which weights each method's contributions (LASSO 30%, Random Forest 40%, and correlation 30%) and provides a bonus for features that perform well across multiple methods. Features selected by more methods receive higher total scores through a multiplicative bonus factor. The process concludes by ranking all features according to their composite scores and selecting the top 25 features for subsequent modelling. This methodology ensures that the selected features are not only individually predictive but also consistently identified across different selection techniques, potentially leading to more robust model performance.
 
-- Drift (recent wind transport)
+### Stratified Splitting and Class Balance Correction
 
-- Summit.Air.Temp and Air.Temp (thermal state)
+The refined dataset of 7 530 observations underwent stratified partitioning to maintain proportional class representation across training (70%, 5,273 samples), validation (15%, 1,129 samples), and test (15%, 1,128 samples) sets. This preserved the natural class imbalance for realistic evaluation whilst ensuring adequate representation of each hazard level.
 
-- Total.Snow.Depth (load)
+Class imbalance in the training set showed a severe 12.4:1 ratio between majority and minority classes, necessitating corrective sampling. We applied ROSE exclusively to training data post-split to prevent data leakage, using an iterative one-versus-rest strategy to accommodate ROSE's binary classification requirement. Synthetic samples were generated for minority classes until reaching approximately 95% of majority class size, avoiding perfect balance that might introduce artificial patterns.
 
-- Wind.Speed/Summit.Wind.Speed (loading potential)
-
-- Max.Temp.Grad (faceting potential)
-
-- *Snow.Temp*
-
-- *Insolation*
-
-- Wind_Chill, Snow_Alt_Interaction, and Day_of_Year (engineered terms)
-
-- *Precip.Code*
-
-- *Season_Winter*
-
-- Area_Lochaber and Area_Torridon
-
-## Implementation
-
-### Data Splitting and ROSE Balancing
-
-The cleansed dataset of 7,530 observations was split into training (70%), validation (15%), and test (15%) sets, stratified by hazard level to maintain class proportions. This yielded 5,273 training samples, 1,129 validation samples, and 1,128 test samples from the 7,530 complete cases. The training set reflected the dataset's imbalance, with Low (class 0) and Moderate (class 1) each >1,700 samples, versus only 145 for High (class 4)—an imbalance ratio of ~12.4:1. Validation and test sets preserved similar distributions, retaining the rarity of high-hazard classes.
-
-To mitigate bias toward majority classes, ROSE balancing was applied solely to the training data post-split, keeping validation/test sets natural for unbiased evaluation. Using an iterative one-versus-rest approach (since ROSE is binary-native), synthetic samples were generated for minorities until they reached ~95% of majority size, avoiding perfect balance.
-
-The training set grew from 5,273 to 8,641 samples, with ~1,700 per class, reducing the imbalance ratio to 1.05:1 (a 91.5% improvement). This enhanced minority representation for neural network training while ensuring realistic evaluation.
+The enhanced training set expanded from 5,273 to 8,641 observations with roughly 1,700 samples per class, reducing imbalance to 1.05:1 (91.5% improvement). This substantial rebalancing provides the neural network with sufficient minority class examples for effective learning whilst maintaining natural class distributions in validation and test sets for unbiased performance evaluation.
 
 ### Neural Network Architecture
 
-After hyperparameter tuning across three candidate configurations, the optimal network achieved a validation accuracy of 0.6138 with a corresponding training accuracy of 0.7159. This represented the best trade-off between learning capacity and generalization. The final architecture consisted of three hidden layers with 512, 256, and 128 units, respectively, paired with progressively increasing dropout regularization (0.20, 0.30, 0.40). Gaussian noise was applied at the input layer to mitigate overfitting and improve robustness against noisy environmental predictors. The network was trained using the Adam optimizer with a learning rate of 5×10⁻⁴ and a batch size of 32, which provided stable convergence during training.
+After hyperparameter tuning across three candidate configurations, the optimal network achieved a validation accuracy of 0.6138 with a corresponding training accuracy of 0.7159. This represented the best trade-off between learning capacity and generalisation. The final architecture consisted of three hidden layers with 512, 256, and 128 units, respectively, paired with progressively increasing dropout regularisation (0.20, 0.30, 0.40). Gaussian noise was applied at the input layer to mitigate overfitting and improve robustness against noisy environmental predictors. The network was trained using the Adam optimiser with a learning rate of 5×10⁻⁴ and a batch size of 32, which provided stable convergence during training.
 
 | Layer          | Units | Dropout | Notes                             |
 |----------------|-------|---------|-----------------------------------|
@@ -235,9 +192,9 @@ The training and validation curves showed that the model achieved stable converg
 
 ### Overall Performance
 
-The neural network’s performance was assessed across the training, validation, and test datasets to evaluate both its learning capacity and generalization ability. During training, the model achieved a best training accuracy of 71.6%, with the corresponding best validation accuracy reaching 61.4%. The final test accuracy was 60.6% (loss = 0.993). The gap between training and validation performance indicates some overfitting, which is expected in complex models, but the close alignment of validation and test results shows that the network generalized reasonably well to unseen data and avoided substantial performance degradation. 
+The neural network’s performance was assessed across the training, validation, and test datasets to evaluate both its learning capacity and generalisation ability. During training, the model achieved a best training accuracy of 71.6%, with the corresponding best validation accuracy reaching 61.4%. The final test accuracy was 60.6% (loss = 0.993). The gap between training and validation performance indicates some overfitting, which is expected in complex models, but the close alignment of validation and test results shows that the network generalised reasonably well to unseen data and avoided substantial performance degradation. 
 
-Beyond test accuracy, complementary metrics provided deeper insight into generalization. Macro-averaged scores (precision = 0.499, recall = 0.452, F1 = 0.459) showed that the model was only moderately effective when treating all classes equally. Weighted averages were higher (precision = 0.589, recall = 0.606, F1 = 0.594), reflecting stronger performance on the dominant classes. Cohen’s Kappa, at 0.443, placed the model in the “moderate agreement” range, showing that predictions were significantly better than random guessing but not yet highly reliable. EDA findings again provide explanation: the removal of several snowpack variables with >20% missingness reduced the depth of predictive features, while extreme but plausible outliers (e.g., very high winds, deep snowpack events) complicated the learning process, particularly for rarer hazard categories.
+Beyond test accuracy, complementary metrics provided deeper insight into generalisation. Macro-averaged scores (precision = 0.499, recall = 0.452, F1 = 0.459) showed that the model was only moderately effective when treating all classes equally. Weighted averages were higher (precision = 0.589, recall = 0.606, F1 = 0.594), reflecting stronger performance on the dominant classes. Cohen’s Kappa, at 0.443, placed the model in the “moderate agreement” range, showing that predictions were significantly better than random guessing but not yet highly reliable. EDA findings again provide explanation: the removal of several snowpack variables with >20% missingness reduced the depth of predictive features, while extreme but plausible outliers (e.g., very high winds, deep snowpack events) complicated the learning process, particularly for rarer hazard categories.
 
 Given the ordinal nature of avalanche hazard levels, error magnitudes were as important as raw accuracy. Predictions deviated by an average of only 0.45 hazard levels (MAE), with relatively low dispersion (RMSE = 0.765; MSE = 0.585). Adjacent accuracy was exceptionally high (94.5% within ±1 level), while extreme misclassifications were nearly absent (99.5% within ±2 levels; 100% within ±3 levels). These findings confirm that catastrophic errors (e.g., predicting Low when the true level was High) were virtually eliminated. This aligns with EDA evidence showing that extreme meteorological conditions such as heavy snowfall or very strong winds rarely overlapped with Low hazard conditions, providing the model with clearer separation at the extremes.
 
@@ -275,7 +232,7 @@ The confusion matrix offered a clear breakdown of how the model performed across
 
 The Considerable– class performed less consistently (precision = 0.526, recall = 0.553, F1 = 0.539). Misclassifications were concentrated between adjacent levels: 79 cases confused with Moderate and 20 with Considerable+. This behavior aligns with the transitional nature of predictors highlighted in the EDA, where snow depth, crystal type, and summit air temperature overlapped substantially between Moderate and Considerable– categories.
 
-Performance deteriorated sharply for the Considerable+ and High hazard levels, which achieved very low recall (0.241 and 0.091, respectively) and correspondingly low F1-scores (0.280 and 0.143). High cases were most often misclassified as Considerable– (14 cases) or Considerable+ (15 cases), but crucially, none were mistaken for Low. This indicates that while the model struggled to distinguish among upper hazard levels, it preserved ordinal structure and avoided catastrophic misclassifications. The EDA findings explain this limitation: these rare categories comprised less than 5% of the dataset and were characterized by overlapping meteorological signals such as heavy snowfall, wind drift, and deep weak layers. With limited training samples, the network could not fully disentangle these patterns.
+Performance deteriorated sharply for the Considerable+ and High hazard levels, which achieved very low recall (0.241 and 0.091, respectively) and correspondingly low F1-scores (0.280 and 0.143). High cases were most often misclassified as Considerable– (14 cases) or Considerable+ (15 cases), but crucially, none were mistaken for Low. This indicates that while the model struggled to distinguish among upper hazard levels, it preserved ordinal structure and avoided catastrophic misclassifications. The EDA findings explain this limitation: these rare categories comprised less than 5% of the dataset and were characterised by overlapping meteorological signals such as heavy snowfall, wind drift, and deep weak layers. With limited training samples, the network could not fully disentangle these patterns.
 
 The per-class F1-scores reflected this gradient in performance: Low (0.775) and Moderate (0.558) were acceptable, Considerable– was moderate (0.539), while Considerable+ (0.280) and High (0.143) were poor. These values highlight the central trade-off of the model: strong utility in predicting stable and moderately unstable conditions, but weak reliability in capturing rare but operationally critical high-risk categories.
 
@@ -347,15 +304,11 @@ Wind- and temperature-related factors such as Air Temperature, Wind Chill, and W
 
 In summary, the most important features reflected a combination of snowpack properties, meteorological drivers, and seasonal patterns, confirming that the model’s predictive behaviour was rooted in meaningful physical processes identified during the exploratory analysis.
 
-::: {#fig-feature-importance}
-![Group of graphs and diagrams showing feature importance](../R work/Graphs/fig7.jpg)
-
-Feature importance graphs
-:::
+![Feature importance graphs](../R work/Graphs/fig7.jpg){#fig-feature-importance fig-cap="Feature importance graphs"}
 
 ## Conclusion and Recommendations
 
-This study evaluated the application of a neural network model to forecast avalanche hazard levels in Scotland, integrating exploratory data analysis, feature engineering, and rigorous model evaluation.The neural network achieved a training accuracy of 71.6%, a validation accuracy of 61.4%, and a test accuracy of 60.6%, showing good generalization without major overfitting. While exact classification accuracy was moderate, 94.5% of predictions were within ±1 hazard level, and errors averaged only 0.45 levels, indicating that the model preserved ordinal structure and avoided large-scale misclassifications. Performance was strongest for Low and Moderate hazards but much weaker for rare severe levels (Considerable+ and High), reflected in a Critical Miss Rate of 18.1% and a Safety Effectiveness of 74.6%
+This study evaluated the application of a neural network model to forecast avalanche hazard levels in Scotland, integrating exploratory data analysis, feature engineering, and rigorous model evaluation.The neural network achieved a training accuracy of 71.6%, a validation accuracy of 61.4%, and a test accuracy of 60.6%, showing good generalisation without major overfitting. While exact classification accuracy was moderate, 94.5% of predictions were within ±1 hazard level, and errors averaged only 0.45 levels, indicating that the model preserved ordinal structure and avoided large-scale misclassifications. Performance was strongest for Low and Moderate hazards but much weaker for rare severe levels (Considerable+ and High), reflected in a Critical Miss Rate of 18.1% and a Safety Effectiveness of 74.6%
 
 Feature importance confirmed that avalanche risk was primarily driven by snowpack properties (Foot Penetration, Snow Depth, Crystal Type), wind-related processes (Drift, Wind Chill, Wind Speed), and temperature gradients (Summit Air Temperature, Air Temperature), alongside seasonal and regional influences.
 
@@ -371,6 +324,8 @@ To improve performance, future work should focus on better representation of hig
 ## References (APA)
 
 <a id="ref-bishop-2006"></a>Bishop, C. M. (2006). *Pattern recognition and machine learning*. Springer.
+
+<a id="ref-anthropic2024claude"></a>Anthropic. (2024). *Claude Sonnet 4 (December 28 version)* [Large language model]. https://claude.ai/chat
 
 <a id="ref-eaws-nd"></a>European Avalanche Warning Services. (n.d.). *Danger scale and standards*. https://www.avalanches.org
 

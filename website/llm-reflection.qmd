@@ -4,6 +4,7 @@ embed-resources: true
 format: 
   html:
     theme: sais-theme.scss
+    css: styles.css
 ---
 
 ## AI Statement

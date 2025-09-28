@@ -1,1 +1,34 @@
 /* css styles */
+body {
+  text-align: justify;
+}
+ 
+.quarto-title-block,
+.quarto-figure,
+.quarto-table,
+.quarto-section {
+  margin-left: auto;
+  margin-right: auto;
+}
+ 
+img, table {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Figure caption centering - cover all possible Quarto caption classes */
+.fig-caption,
+.figure-caption,
+.quarto-figure-caption,
+figcaption {
+  text-align: center !important;
+}
+
+/* Alternative approach - target by element */
+figure figcaption,
+div.quarto-figure figcaption {
+  text-align: center !important;
+}
+
+ 
