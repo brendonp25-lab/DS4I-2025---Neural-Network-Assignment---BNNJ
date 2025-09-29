@@ -27,8 +27,6 @@ format:
 
 Avalanche forecasting integrates mountain meteorology, snowpack physics, terrain analysis, and risk communication to reduce loss of life and support safer winter travel. In Scotland, the Scottish Avalanche Information Service (SAIS) publishes daily next-day hazard assessments across six high-mountain regions during winter which draws upon field observations, snowpack tests and weather guidance ([Scottish Avalanche Information Service [SAIS], n.d.](#ref-sais-nd)). This report contributes a data-driven complement to that long-running operational effort. Our task is defined as to construct and evaluate a neural network model that predicts the forecasted avalanche hazard (FAH).
 
-This research isn’t meant to replace expert judgment. It gives forecasters a second opinion that consistently flags risky combinations of weather, terrain, and snowpack variables. In Scotland’s maritime, wind-dominated winters with frequent storm cycles and rapid thaw freeze shifts this kind of decision support sharpens situational awareness and strengthens risk communication ([SAIS, n.d.](#ref-sais-nd); [EAWS, n.d.](#ref-eaws-nd)).
-
 ## Background
 
 Scotland’s avalanche forecasts are produced by the Scottish Avalanche Information Service (SAIS). The SAIS conducts daily fieldwork, snow profiles, stability tests and terrain analysis that is blended with meteorological guidance to issue next-day public danger ratings, snowpack summaries and travel advice. This information spans Torridon, Northern Cairngorms, Southern Cairngorms, Creag Meagaidh, Lochaber, and Glencoe. The communication follows the standard EAWS danger scale to keep messages consistent and comparable.
@@ -43,15 +41,17 @@ The dataset is an operational archive produced by the Scottish Avalanche Informa
 
 The feature set can be categorised into five distinct groups that collectively capture the multifaceted nature of avalanche risk assessment:
 
-**Spatial and Temporal Features** include Date, Area, longitude, latitude, and altitude, which establish the geographical and temporal context of each observation. These variables are crucial for understanding regional variations in avalanche conditions and seasonal patterns across Scotland's diverse mountain terrain.
+**Spatial and Temporal Features** - Location data (coordinates, altitude) and dates that help track where and when avalanches occur across different regions and seasons.
 
-**Topographical Features** encompass Aspect and Incline, which directly influence avalanche susceptibility. Slope angle determines the gravitational stress on the snowpack, while aspect affects wind loading, solar exposure, and temperature variations that influence snow stability.
+**Topographical Features** - Terrain characteristics like slope angle and direction that affect avalanche risk (steeper slopes increase stress on snow; direction impacts wind, sun, and temperature).
 
-**Meteorological Features** comprise a comprehensive set of weather observations including air temperature, wind direction and speed (both at observation level and summit), cloud cover, precipitation codes, and insolation. These variables capture the atmospheric conditions that drive snow accumulation, redistribution, and metamorphism processes fundamental to avalanche formation.
+**Meteorological Features** - Weather conditions including temperature, wind, clouds, precipitation, and sunlight that control how snow accumulates and changes.
 
-**Snowpack Physical Properties** include total snow depth, foot and ski penetration measurements, snow temperature, crystal characteristics, wetness levels, and drift indicators. These features provide direct measures of snowpack structure, density, and mechanical properties that determine stability and failure potential.
+**Snowpack Physical Properties** - Direct measurements of the snow itself: depth, penetration resistance, temperature, crystal types, moisture content, and wind-drifted snow patterns.
 
-**Snowpack Stability Indicators** encompass specialised measurements such as temperature and hardness gradients, settlement patterns, and composite indices like Snow.Index and AV.Cat. These derived metrics capture the complex internal structure and stress distribution within the snowpack that directly relate to avalanche hazard assessment [@anthropic2024claude].
+**Snowpack Stability Indicators** - Specialized measurements and calculations (temperature/hardness changes, settling rates, composite indices) that assess the internal structure and stress within the snowpack to predict avalanche danger.
+
+Together, these variables provide a comprehensive framework for understanding and forecasting avalanche hazards in Scottish mountains. [@anthropic2024claude].
 
 By relating these predictors to FAH the model can learn recurrent, non-linear patterns. It highlights situations where higher hazard is more likely, so forecasters can focus their checks and make cleaner day-to-day calls ([EAWS, n.d.](#ref-eaws-nd); [SAIS, n.d.](#ref-sais-nd)).
 
